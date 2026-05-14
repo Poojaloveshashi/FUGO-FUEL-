@@ -39,10 +39,18 @@ export default function App() {
 
   // Authentication persistence simulation
   useEffect(() => {
-    const savedUser = localStorage.getItem('fugo_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-      setCurrentScreen('home');
+    try {
+      const savedUser = localStorage.getItem('fugo_user');
+      if (savedUser && savedUser !== 'undefined') {
+        const parsed = JSON.parse(savedUser);
+        if (parsed && parsed.phone) {
+          setUser(parsed);
+          setCurrentScreen('home');
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load user', e);
+      localStorage.removeItem('fugo_user');
     }
   }, []);
 

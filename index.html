@@ -2,12 +2,51 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <title>Fugo Fuel | 15-Minute Delivery</title>
+    <meta name="description" content="On-demand fuel delivery and vehicle services in 15 minutes." />
+    <style>
+      body { margin: 0; background: #f8fafc; font-family: 'Inter', sans-serif; }
+      #root-loader {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        color: #64748b;
+        gap: 16px;
+      }
+      .spinner {
+        width: 32px;
+        height: 32px;
+        border: 4px solid #e2e8f0;
+        border-top-color: #f97316;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <div id="root">
+      <div id="root-loader">
+        <div class="spinner"></div>
+        <p>Initializing Fugo Fuel...</p>
+      </div>
+    </div>
+    <script type="module" src="./src/main.tsx"></script>
+    <script>
+      window.onerror = function(msg, url, line, col, error) {
+        console.error('Window Error:', msg, url, line);
+        var root = document.getElementById('root');
+        if (root && root.innerHTML.includes('Initializing')) {
+          root.innerHTML = '<div style="padding: 20px; color: red;"><h3>Application Error</h3><p>' + msg + '</p><p>Please check your connection and try again.</p></div>';
+        }
+      };
+    </script>
   </body>
 </html>
 
