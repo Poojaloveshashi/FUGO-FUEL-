@@ -32,7 +32,10 @@ export default function Home({ onNavigate, selectedLocation, onLocationChange, l
           <span className="font-bold text-lg tracking-tight">Fugo Fuel</span>
         </div>
         <div className="flex items-center gap-4">
-          <button className="relative">
+          <button 
+            onClick={() => onNavigate('notifications')}
+            className="relative active:scale-95 transition-transform"
+          >
             <Bell className="w-6 h-6 text-slate-400" />
             <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 border-2 border-white rounded-full text-[10px] text-white flex items-center justify-center font-bold">2</span>
           </button>
