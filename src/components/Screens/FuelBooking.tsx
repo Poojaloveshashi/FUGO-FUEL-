@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { ChevronLeft, MapPin, Fuel, ArrowRight } from 'lucide-react';
-import { Product } from '../../types';
+import { UserLocation, Product } from '../../types';
 
 interface FuelBookingProps {
   products: Product[];
   onBack: () => void;
   onAddToCart: (p: Product, q: number) => void;
   onGoToCheckout: () => void;
+  location: UserLocation;
 }
 
-export default function FuelBooking({ products, onBack, onAddToCart, onGoToCheckout }: FuelBookingProps) {
+export default function FuelBooking({ products, onBack, onAddToCart, onGoToCheckout, location }: FuelBookingProps) {
   const [selectedProduct, setSelectedProduct] = useState<Product>(products[0]);
   const [quantity, setQuantity] = useState(10);
   const [added, setAdded] = useState(false);
@@ -26,7 +27,7 @@ export default function FuelBooking({ products, onBack, onAddToCart, onGoToCheck
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
       {/* Header */}
-      <header className="p-4 flex items-center gap-4 bg-white sticky top-0 z-10 border-b border-slate-100">
+      <header className="p-4 flex items-center gap-4 bg-white sticky top-0 z-20 border-b border-slate-100">
         <button onClick={onBack} className="p-2 hover:bg-slate-50 rounded-full transition-colors">
           <ChevronLeft className="w-6 h-6" />
         </button>
@@ -34,6 +35,21 @@ export default function FuelBooking({ products, onBack, onAddToCart, onGoToCheck
       </header>
 
       <div className="flex-1 p-6 space-y-8">
+        {/* Station Info Banner */}
+        <section className="relative h-32 rounded-3xl overflow-hidden shadow-md shadow-orange-50 group">
+          <img 
+            src="https://images.unsplash.com/photo-1545644161-591605335805?auto=format&fit=crop&q=80&w=600" 
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
+            alt="Station"
+            referrerPolicy="no-referrer"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-orange-600/80 to-transparent p-5 flex flex-col justify-center">
+            <span className="text-[10px] text-white/70 font-black uppercase tracking-widest mb-1">Dispatching from</span>
+            <h2 className="text-white text-lg font-bold leading-tight">Fugo Express {location.city} Hub</h2>
+            <p className="text-white/80 text-[10px] mt-0.5">Automated quality check enabled</p>
+          </div>
+        </section>
+
         {/* Product Selection */}
         <section>
           <label className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-4 block">Select Fuel Type</label>
@@ -100,11 +116,11 @@ export default function FuelBooking({ products, onBack, onAddToCart, onGoToCheck
                 <MapPin className="text-orange-400 w-5 h-5" />
              </div>
              <div className="flex-1">
-                <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-1">Standard Delivery</p>
-                <h3 className="font-semibold text-sm mb-1 leading-tight">Home: No 42, 2nd Cross, MG Road, Bangalore</h3>
+                <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-1">Standard Delivery • {location.city} Station</p>
+                <h3 className="font-semibold text-sm mb-1 leading-tight">{location.name}: {location.address}, {location.city}</h3>
                 <div className="flex items-center gap-2 mt-2">
                   <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
-                  <span className="text-[10px] font-bold text-green-400 uppercase tracking-widest">15 Mins Delivery</span>
+                  <span className="text-[10px] font-bold text-green-400 uppercase tracking-widest">Nearby Station (350m) • 15 Mins</span>
                 </div>
              </div>
           </div>

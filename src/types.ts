@@ -1,3 +1,10 @@
+export interface UserLocation {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+}
+
 export type Screen = 'login' | 'home' | 'fuel' | 'parts' | 'services' | 'checkout' | 'tracking';
 
 export interface Product {
@@ -15,6 +22,8 @@ export interface Order {
   items: { product: Product; quantity: number }[];
   status: 'processing' | 'dispatched' | 'nearby' | 'delivered';
   total: number;
+  deliveryFee: number;
+  distance: number;
   deliveryAddress: string;
   estimatedTime: number; // in minutes
   createdAt: number;

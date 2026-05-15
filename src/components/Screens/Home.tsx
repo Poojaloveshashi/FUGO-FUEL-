@@ -1,13 +1,20 @@
-import { motion } from 'motion/react';
-import { Fuel, Settings, ShoppingBag, Wrench, Navigation, Bell, MapPin, Search } from 'lucide-react';
-import { Screen } from '../../types';
+import { motion, AnimatePresence } from 'motion/react';
+import { Fuel, Settings, ShoppingBag, Wrench, Navigation, Bell, MapPin, ChevronDown } from 'lucide-react';
+import { Screen, UserLocation } from '../../types';
+import { useState } from 'react';
 
 interface HomeProps {
   onNavigate: (screen: Screen) => void;
   userPhone: string;
+  selectedLocation: UserLocation;
+  onLocationChange: (loc: UserLocation) => void;
+  locations: UserLocation[];
+  cartCount: number;
 }
 
-export default function Home({ onNavigate }: HomeProps) {
+export default function Home({ onNavigate, selectedLocation, onLocationChange, locations, cartCount }: HomeProps) {
+  const [showLocations, setShowLocations] = useState(false);
+
   const categories = [
     { id: 'fuel', icon: Fuel, label: 'Fuel Up', color: 'bg-orange-500', desc: 'Petrol/Diesel' },
     { id: 'parts', icon: ShoppingBag, label: 'Spare Parts', color: 'bg-slate-900', desc: 'Engine/Body' },
@@ -37,20 +44,65 @@ export default function Home({ onNavigate }: HomeProps) {
 
       <div className="p-6 space-y-8">
         {/* Location Selector */}
-        <section className="bg-slate-900 text-white p-4 rounded-2xl flex items-center justify-between shadow-xl shadow-slate-200">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
-              <MapPin className="text-orange-400 w-5 h-5" />
+        <section className="relative">
+          <div 
+            onClick={() => setShowLocations(!showLocations)}
+            className="bg-slate-900 text-white p-4 rounded-2xl flex items-center justify-between shadow-xl shadow-slate-200 cursor-pointer hover:bg-slate-800 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
+                <MapPin className="text-orange-400 w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Delivering to</p>
+                <div className="flex items-center gap-1">
+                  <h3 className="font-semibold text-sm truncate max-w-[120px]">{selectedLocation.name}</h3>
+                  <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${showLocations ? 'rotate-180' : ''}`} />
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Delivering to</p>
-              <h3 className="font-semibold text-sm truncate w-40">MG Road, Bangalore</h3>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] bg-white/10 px-2 py-1 rounded font-bold text-orange-400">{selectedLocation.city}</span>
+              <Navigation className="w-5 h-5 text-slate-400" />
             </div>
           </div>
-          <button className="bg-white/10 hover:bg-white/20 p-2 rounded-lg transition-colors">
-            <Navigation className="w-5 h-5" />
-          </button>
+
+          {/* Location Dropdown */}
+          <AnimatePresence>
+            {showLocations && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border border-slate-100 shadow-2xl z-20 overflow-hidden"
+              >
+                <div className="p-3 border-b border-slate-50 bg-slate-50">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-3">Saved Locations</p>
+                </div>
+                {locations.map((loc) => (
+                  <button
+                    key={loc.id}
+                    onClick={() => {
+                      onLocationChange(loc);
+                      setShowLocations(false);
+                    }}
+                    className={`w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors text-left ${selectedLocation.id === loc.id ? 'bg-orange-50' : ''}`}
+                  >
+                    <div>
+                      <h4 className={`font-bold text-sm ${selectedLocation.id === loc.id ? 'text-orange-600' : 'text-slate-800'}`}>{loc.name}</h4>
+                      <p className="text-xs text-slate-400">{loc.address}</p>
+                    </div>
+                    {selectedLocation.id === loc.id && (
+                      <div className="w-2 h-2 bg-orange-500 rounded-full" />
+                    )}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </section>
+
+
 
         {/* Promo Banner */}
         <motion.section 
@@ -59,14 +111,14 @@ export default function Home({ onNavigate }: HomeProps) {
           className="relative h-44 rounded-3xl overflow-hidden shadow-lg shadow-orange-100 group"
         >
           <img 
-            src="https://picsum.photos/seed/delivery/800/600" 
+            src="https://images.unsplash.com/photo-1545644161-591605335805?auto=format&fit=crop&q=80&w=800" 
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
-            alt="promo"
+            alt="Fugo Express Station"
             referrerPolicy="no-referrer"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-orange-600/90 via-orange-600/20 to-transparent p-6 flex flex-col justify-end">
-            <h2 className="text-white text-2xl font-bold leading-tight line-clamp-2">Get your first fuel delivery FREE!</h2>
-            <p className="text-white/80 text-sm mt-1">Valid only for first 100 users today</p>
+            <h2 className="text-white text-2xl font-bold leading-tight line-clamp-2">Fugo Express: {selectedLocation.city} Station</h2>
+            <p className="text-white/80 text-sm mt-1">15-Minute delivery guaranteed from nearest station</p>
           </div>
         </motion.section>
 
@@ -99,44 +151,33 @@ export default function Home({ onNavigate }: HomeProps) {
           </div>
         </section>
 
-        {/* Essential Items Section */}
-        <section>
-          <h2 className="font-bold text-lg mb-4">Emergency Essentials</h2>
-          <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide -mx-6 px-6">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="min-w-[160px] bg-white rounded-2xl border border-slate-100 p-3 shadow-sm shadow-slate-100">
-                <div className="h-24 bg-slate-100 rounded-xl mb-3 overflow-hidden">
-                  <img src={`https://picsum.photos/seed/item${i}/300/200`} className="w-full h-full object-cover" alt="item" referrerPolicy="no-referrer" />
-                </div>
-                <h4 className="font-bold text-sm text-slate-800 truncate">Generic {i === 1 ? 'Oil' : i === 2 ? 'Mist' : 'Lube'}</h4>
-                <div className="flex items-center justify-between mt-2">
-                  <span className="text-orange-600 font-bold text-sm">₹{i * 199}</span>
-                  <button className="bg-slate-100 w-8 h-8 rounded-lg flex items-center justify-center text-slate-500">+</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
       </div>
 
       {/* Bottom Nav */}
       <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/80 backdrop-blur-lg border-t border-slate-100 px-8 py-3 flex justify-between items-center z-20">
-        <NavButton icon={Navigation} active />
-        <NavButton icon={Search} />
+        <NavButton icon={Navigation} active onClick={() => onNavigate('home')} />
         <div className="bg-orange-500 w-12 h-12 rounded-full -mt-10 flex items-center justify-center shadow-xl shadow-orange-300 border-4 border-white active:scale-90 transition-transform cursor-pointer" onClick={() => onNavigate('fuel')}>
           <Fuel className="text-white w-6 h-6" />
         </div>
-        <NavButton icon={ShoppingBag} />
-        <NavButton icon={Settings} />
+        <NavButton icon={ShoppingBag} onClick={() => onNavigate('checkout')} badge={cartCount > 0 ? cartCount : undefined} />
+        <NavButton icon={Settings} onClick={() => {}} />
       </nav>
     </div>
   );
 }
 
-function NavButton({ icon: Icon, active = false }: { icon: any; active?: boolean }) {
+function NavButton({ icon: Icon, active = false, onClick, badge }: { icon: any; active?: boolean; onClick?: () => void; badge?: number }) {
   return (
-    <button className={`p-2 transition-colors ${active ? 'text-orange-500' : 'text-slate-400 hover:text-slate-600'}`}>
+    <button 
+      onClick={onClick}
+      className={`p-2 transition-colors relative ${active ? 'text-orange-500' : 'text-slate-400 hover:text-slate-600'}`}
+    >
       <Icon className="w-6 h-6" />
+      {badge !== undefined && (
+        <span className="absolute top-1 right-1 w-4 h-4 bg-orange-600 text-white text-[8px] font-black rounded-full flex items-center justify-center border-2 border-white">
+          {badge}
+        </span>
+      )}
     </button>
   );
 }

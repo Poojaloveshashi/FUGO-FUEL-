@@ -93,7 +93,7 @@ export default function Tracking({ order, onBack }: TrackingProps) {
                <h2 className="text-3xl font-black text-slate-900 tracking-tight">
                   {minutes}<span className="text-orange-500">:</span>{seconds < 10 ? `0${seconds}` : seconds}
                </h2>
-               <p className="text-sm text-slate-400 font-medium">Estimated Arrival Time</p>
+               <p className="text-sm text-slate-400 font-medium">Estimated Arrival Time ({(order.distance * 1000).toFixed(0)}m away)</p>
             </div>
             <div className="text-right">
                <span className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest ${
@@ -141,7 +141,7 @@ export default function Tracking({ order, onBack }: TrackingProps) {
                   />
                   <ProgressStep 
                     title="Agent Dispatched" 
-                    desc="Rahul is heading to your location" 
+                    desc="Rahul left Fugo Express MG Road" 
                     active={status !== 'processing'} 
                     completed={status === 'nearby' || status === 'delivered'} 
                   />

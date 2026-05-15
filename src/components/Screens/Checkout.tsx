@@ -1,26 +1,31 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronLeft, MapPin, CreditCard, ChevronRight, X, Clock, ShieldCheck } from 'lucide-react';
-import { Product } from '../../types';
+import { ChevronLeft, MapPin, CreditCard, ChevronRight, X, Clock, ShieldCheck, ShoppingBag } from 'lucide-react';
+import { UserLocation, Product } from '../../types';
 
 interface CheckoutProps {
   cart: { product: Product; quantity: number }[];
   onBack: () => void;
-  onPlaceOrder: (address: string) => void;
+  onPlaceOrder: (address: string, fee: number, dist: number) => void;
+  location: UserLocation;
 }
 
-export default function Checkout({ cart, onBack, onPlaceOrder }: CheckoutProps) {
+export default function Checkout({ cart, onBack, onPlaceOrder, location }: CheckoutProps) {
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'upi' | 'wallet'>('upi');
   const [isPlacing, setIsPlacing] = useState(false);
 
+  // Simulated distance to nearest station (in km)
+  const distance = 0.35; // 350 meters
   const subtotal = cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
-  const deliveryFee = 49;
+  
+  // Dynamic Delivery Fee Logic: ₹25 if < 0.5km, else ₹49
+  const deliveryFee = distance < 0.5 ? 25 : 49;
   const total = subtotal + deliveryFee;
 
   const handlePlaceOrder = () => {
     setIsPlacing(true);
     setTimeout(() => {
-      onPlaceOrder("Home: No 42, 2nd Cross, MG Road, Bangalore");
+      onPlaceOrder(`${location.name}: ${location.address}, ${location.city}`, deliveryFee, distance);
     }, 2000);
   };
 
@@ -34,19 +39,54 @@ export default function Checkout({ cart, onBack, onPlaceOrder }: CheckoutProps) 
       </header>
 
       <div className="flex-1 p-6 space-y-6">
-        {/* Delivery Info */}
-        <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-           <div className="flex items-center justify-between mb-4">
-              <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400">Delivery Location</span>
-              <button className="text-orange-500 text-xs font-bold">Change</button>
+        {cart.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center px-4">
+            <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-6">
+              <ShoppingBag className="w-10 h-10 text-slate-300" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-800 mb-2">Your cart is empty</h2>
+            <p className="text-slate-400 text-sm mb-8 leading-relaxed">Looks like you haven't added anything to your cart yet. Browse our fuels and services to get started.</p>
+            <button 
+              onClick={onBack}
+              className="px-8 py-4 bg-orange-500 text-white rounded-2xl font-bold shadow-lg shadow-orange-100 hover:bg-orange-600 transition-colors"
+            >
+              Start Shopping
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Delivery Info */}
+            <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+           <div className="flex items-center justify-between mb-5">
+              <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400">Delivery Chain</span>
+              <div className="flex items-center gap-1.5">
+                 <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                 <span className="text-[10px] font-bold text-green-600 uppercase tracking-widest">Optimized Route</span>
+              </div>
            </div>
-           <div className="flex items-start gap-4">
-              <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center shrink-0">
+
+           <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 mb-4">
+              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shrink-0 border border-slate-200 overflow-hidden shadow-sm">
+                  <img 
+                    src="https://images.unsplash.com/photo-1545644161-591605335805?auto=format&fit=crop&q=80&w=100" 
+                    className="w-full h-full object-cover" 
+                    alt="hub"
+                  />
+              </div>
+              <div className="flex-1">
+                  <h3 className="font-bold text-[10px] text-slate-400 uppercase tracking-widest">Dispatching from</h3>
+                  <p className="text-xs text-orange-600 font-bold mt-0.5">Fugo Express {location.city} Hub</p>
+                  <p className="text-[9px] text-slate-400 mt-0.5 leading-tight italic">Verified Quality • Tamper Proof Seal</p>
+              </div>
+           </div>
+           
+           <div className="flex items-start gap-4 border-t border-slate-100 pt-4">
+              <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center shrink-0 shadow-sm shadow-orange-50">
                  <MapPin className="text-orange-500 w-5 h-5" />
               </div>
               <div className="flex-1">
-                 <h3 className="font-bold text-sm text-slate-800">Home</h3>
-                 <p className="text-xs text-slate-400 leading-relaxed mt-0.5">No 42, 2nd Cross, MG Road, Bangalore - 560001</p>
+                 <h3 className="font-bold text-sm text-slate-800">{location.name}</h3>
+                 <p className="text-xs text-slate-400 leading-relaxed mt-0.5">{location.address}, {location.city}</p>
               </div>
            </div>
            <div className="mt-4 pt-4 border-t border-dashed border-slate-100 flex items-center gap-3">
@@ -82,7 +122,14 @@ export default function Checkout({ cart, onBack, onPlaceOrder }: CheckoutProps) 
               </div>
               <div className="flex justify-between text-sm">
                  <span className="text-slate-400">Delivery Fee</span>
-                 <span className="text-green-600 font-bold">₹{deliveryFee}</span>
+                 <div className="flex flex-col items-end">
+                    <span className={deliveryFee === 25 ? "text-green-600 font-bold" : "text-slate-800 font-medium"}>
+                       ₹{deliveryFee}
+                    </span>
+                    {distance < 0.5 && (
+                      <span className="text-[10px] text-green-500 font-bold uppercase tracking-tight">Nearby Station Discount ({(distance * 1000).toFixed(0)}m)</span>
+                    )}
+                 </div>
               </div>
               <div className="flex justify-between text-lg font-bold border-t border-slate-100 pt-3 mt-2">
                  <span className="text-slate-900">Total</span>
@@ -120,7 +167,9 @@ export default function Checkout({ cart, onBack, onPlaceOrder }: CheckoutProps) 
            <ShieldCheck className="w-4 h-4 text-slate-400" />
            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Secure 128-bit Encrypted Payments</span>
         </div>
-      </div>
+      </>
+    )}
+  </div>
 
       {/* Footer CTA */}
       <footer className="p-6 bg-white border-t border-slate-100">
