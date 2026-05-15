@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { Fuel, Settings, ShoppingBag, Wrench, Navigation, Bell, MapPin, ChevronDown } from 'lucide-react';
+import { Fuel, User, ShoppingBag, Wrench, Navigation, Bell, MapPin, ChevronDown } from 'lucide-react';
 import { Screen, UserLocation } from '../../types';
 import { useState } from 'react';
 
@@ -36,9 +36,12 @@ export default function Home({ onNavigate, selectedLocation, onLocationChange, l
             <Bell className="w-6 h-6 text-slate-400" />
             <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 border-2 border-white rounded-full text-[10px] text-white flex items-center justify-center font-bold">2</span>
           </button>
-          <div className="w-10 h-10 bg-slate-200 rounded-full border-2 border-white overflow-hidden">
+          <button 
+            onClick={() => onNavigate('settings')}
+            className="w-10 h-10 bg-slate-200 rounded-full border-2 border-white overflow-hidden active:scale-95 transition-transform"
+          >
              <img src={`https://api.dicebear.com/7.x/pixel-art/svg?seed=fugo`} alt="avatar" />
-          </div>
+          </button>
         </div>
       </header>
 
@@ -160,7 +163,7 @@ export default function Home({ onNavigate, selectedLocation, onLocationChange, l
           <Fuel className="text-white w-6 h-6" />
         </div>
         <NavButton icon={ShoppingBag} onClick={() => onNavigate('checkout')} badge={cartCount > 0 ? cartCount : undefined} />
-        <NavButton icon={Settings} onClick={() => {}} />
+        <NavButton icon={User} onClick={() => onNavigate('settings')} />
       </nav>
     </div>
   );

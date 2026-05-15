@@ -5,7 +5,7 @@ export interface UserLocation {
   city: string;
 }
 
-export type Screen = 'login' | 'home' | 'fuel' | 'parts' | 'services' | 'checkout' | 'tracking';
+export type Screen = 'login' | 'home' | 'fuel' | 'parts' | 'services' | 'checkout' | 'tracking' | 'settings';
 
 export interface Product {
   id: string;

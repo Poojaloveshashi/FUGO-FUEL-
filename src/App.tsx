@@ -12,6 +12,7 @@ import FuelBooking from './components/Screens/FuelBooking';
 import Store from './components/Screens/Store';
 import Checkout from './components/Screens/Checkout';
 import Tracking from './components/Screens/Tracking';
+import Settings from './components/Screens/Settings';
 
 // Sample data for initial population
 const FUEL_PRODUCTS: Product[] = [
@@ -131,6 +132,8 @@ export default function App() {
         return <Checkout cart={cart} onBack={() => setCurrentScreen('home')} onPlaceOrder={placeOrder} location={selectedLocation} />;
       case 'tracking':
         return <Tracking order={activeOrder} onBack={() => setCurrentScreen('home')} />;
+      case 'settings':
+        return <Settings onBack={() => setCurrentScreen('home')} userPhone={user?.phone || ''} onLogout={logout} />;
       default:
         return <Home onNavigate={setCurrentScreen} userPhone={user?.phone || ''} selectedLocation={selectedLocation} onLocationChange={setSelectedLocation} locations={HYDERABAD_LOCATIONS} cartCount={cart.length} />;
     }
