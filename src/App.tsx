@@ -14,6 +14,14 @@ import Checkout from './components/Screens/Checkout';
 import Tracking from './components/Screens/Tracking';
 import Settings from './components/Screens/Settings';
 import Notifications from './components/Screens/Notifications';
+import OrderHistory from './components/Screens/OrderHistory';
+import SavedAddresses from './components/Screens/SavedAddresses';
+import PersonalInfo from './components/Screens/PersonalInfo';
+import Language from './components/Screens/Language';
+import DarkMode from './components/Screens/DarkMode';
+import PaymentMethods from './components/Screens/PaymentMethods';
+import Services from './components/Screens/Services';
+import FuelPrices from './components/Screens/FuelPrices';
 
 // Sample data for initial population
 const FUEL_PRODUCTS: Product[] = [
@@ -128,15 +136,29 @@ export default function App() {
       case 'parts':
         return <Store title="Vehicle Parts" products={PARTS} onBack={() => setCurrentScreen('home')} onAddToCart={addToCart} onGoToCheckout={() => setCurrentScreen('checkout')} />;
       case 'services':
-        return <Store title="Emergency Services" products={SERVICES} onBack={() => setCurrentScreen('home')} onAddToCart={addToCart} onGoToCheckout={() => setCurrentScreen('checkout')} />;
+        return <Services products={SERVICES} onBack={() => setCurrentScreen('home')} onAddToCart={addToCart} onGoToCheckout={() => setCurrentScreen('checkout')} />;
       case 'checkout':
         return <Checkout cart={cart} onBack={() => setCurrentScreen('home')} onPlaceOrder={placeOrder} location={selectedLocation} />;
       case 'tracking':
         return <Tracking order={activeOrder} onBack={() => setCurrentScreen('home')} />;
       case 'settings':
-        return <Settings onBack={() => setCurrentScreen('home')} userPhone={user?.phone || ''} onLogout={logout} />;
+        return <Settings onBack={() => setCurrentScreen('home')} userPhone={user?.phone || ''} onLogout={logout} onNavigate={setCurrentScreen} />;
       case 'notifications':
         return <Notifications onBack={() => setCurrentScreen('home')} />;
+      case 'orders':
+        return <OrderHistory onBack={() => setCurrentScreen('settings')} />;
+      case 'addresses':
+        return <SavedAddresses onBack={() => setCurrentScreen('settings')} locations={HYDERABAD_LOCATIONS} />;
+      case 'profile':
+        return <PersonalInfo onBack={() => setCurrentScreen('settings')} userPhone={user?.phone || ''} />;
+      case 'language':
+        return <Language onBack={() => setCurrentScreen('settings')} />;
+      case 'darkMode':
+        return <DarkMode onBack={() => setCurrentScreen('settings')} />;
+      case 'payments':
+        return <PaymentMethods onBack={() => setCurrentScreen('settings')} />;
+      case 'fuelPrices':
+        return <FuelPrices onBack={() => setCurrentScreen('home')} />;
       default:
         return <Home onNavigate={setCurrentScreen} userPhone={user?.phone || ''} selectedLocation={selectedLocation} onLocationChange={setSelectedLocation} locations={HYDERABAD_LOCATIONS} cartCount={cart.length} />;
     }

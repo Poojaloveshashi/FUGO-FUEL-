@@ -1,28 +1,31 @@
-import { ChevronLeft, User, Bell, Shield, CreditCard, HelpCircle, LogOut, ChevronRight, Moon, Globe, MapPin } from 'lucide-react';
+import { ChevronLeft, User, Bell, Shield, CreditCard, HelpCircle, LogOut, ChevronRight, Moon, Globe, MapPin, History } from 'lucide-react';
 import { motion } from 'motion/react';
+import { Screen } from '../../types';
 
 interface SettingsProps {
   onBack: () => void;
   userPhone: string;
   onLogout: () => void;
+  onNavigate: (screen: Screen) => void;
 }
 
-export default function Settings({ onBack, userPhone, onLogout }: SettingsProps) {
+export default function Settings({ onBack, userPhone, onLogout, onNavigate }: SettingsProps) {
   const sections = [
     {
       title: 'Profile Settings',
       items: [
-        { icon: User, label: 'Personal Information', value: userPhone, color: 'text-blue-500', bg: 'bg-blue-50' },
-        { icon: CreditCard, label: 'Payment Methods', value: '2 Cards Saved', color: 'text-orange-500', bg: 'bg-orange-50' },
-        { icon: MapPin, label: 'Saved Addresses', value: '3 Locations', color: 'text-green-500', bg: 'bg-green-50' },
+        { icon: User, label: 'Personal Information', value: userPhone, color: 'text-blue-500', bg: 'bg-blue-50', onClick: () => onNavigate('profile') },
+        { icon: History, label: 'Order History', value: 'Recent orders', color: 'text-orange-600', bg: 'bg-orange-100', onClick: () => onNavigate('orders') },
+        { icon: CreditCard, label: 'Payment Methods', value: '2 Cards Saved', color: 'text-orange-500', bg: 'bg-orange-50', onClick: () => onNavigate('payments') },
+        { icon: MapPin, label: 'Saved Addresses', value: '3 Locations', color: 'text-green-500', bg: 'bg-green-50', onClick: () => onNavigate('addresses') },
       ]
     },
     {
       title: 'App Settings',
       items: [
         { icon: Bell, label: 'Notifications', value: 'On', color: 'text-purple-500', bg: 'bg-purple-50' },
-        { icon: Moon, label: 'Dark Mode', value: 'System', color: 'text-slate-700', bg: 'bg-slate-100' },
-        { icon: Globe, label: 'Language', value: 'English (US)', color: 'text-cyan-500', bg: 'bg-cyan-50' },
+        { icon: Moon, label: 'Dark Mode', value: 'System', color: 'text-slate-700', bg: 'bg-slate-100', onClick: () => onNavigate('darkMode') },
+        { icon: Globe, label: 'Language', value: 'English (US)', color: 'text-cyan-500', bg: 'bg-cyan-50', onClick: () => onNavigate('language') },
       ]
     },
     {
@@ -64,6 +67,7 @@ export default function Settings({ onBack, userPhone, onLogout }: SettingsProps)
               {section.items.map((item, itemIdx) => (
                 <button 
                   key={itemIdx}
+                  onClick={item.onClick}
                   className={`w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors ${itemIdx !== section.items.length - 1 ? 'border-b border-slate-50' : ''}`}
                 >
                   <div className="flex items-center gap-4">

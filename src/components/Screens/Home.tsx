@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { Fuel, User, ShoppingBag, Wrench, Navigation, Bell, MapPin, ChevronDown } from 'lucide-react';
+import { Fuel, User, ShoppingBag, Wrench, Navigation, Bell, MapPin, ChevronDown, TrendingUp } from 'lucide-react';
 import { Screen, UserLocation } from '../../types';
 import { useState } from 'react';
 
@@ -127,6 +127,25 @@ export default function Home({ onNavigate, selectedLocation, onLocationChange, l
             <p className="text-white/80 text-sm mt-1">15-Minute delivery guaranteed from nearest station</p>
           </div>
         </motion.section>
+
+        {/* Live Fuel Price Widget */}
+        <section 
+          onClick={() => onNavigate('fuelPrices')}
+          className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center justify-between cursor-pointer hover:border-orange-200 transition-colors group"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+               <TrendingUp className="w-6 h-6 text-orange-500" />
+            </div>
+            <div>
+               <h3 className="text-sm font-bold text-slate-800">Live Fuel Prices</h3>
+               <p className="text-[10px] text-slate-400 font-medium font-mono uppercase tracking-widest mt-0.5">Petrol: ₹109.66 • Diesel: ₹97.82</p>
+            </div>
+          </div>
+          <div className="bg-slate-50 p-2 rounded-xl group-hover:bg-orange-50 transition-colors">
+             <ArrowRightIcon className="w-4 h-4 text-slate-300 group-hover:text-orange-500" />
+          </div>
+        </section>
 
         {/* Categories Grid */}
         <section>
