@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { Fuel, User, ShoppingBag, Wrench, Navigation, Bell, MapPin, ChevronDown, TrendingUp, BarChart3 } from 'lucide-react';
+import { Fuel, User, ShoppingBag, Wrench, Navigation, Bell, MapPin, ChevronDown, TrendingUp, BarChart3, Calendar } from 'lucide-react';
 import { Screen, UserLocation } from '../../types';
 import { useState } from 'react';
 
@@ -163,6 +163,24 @@ export default function Home({ onNavigate, selectedLocation, onLocationChange, l
             </div>
             <div className="bg-slate-50 p-2 rounded-xl group-hover:bg-indigo-50 transition-colors">
                <ArrowRightIcon className="w-4 h-4 text-slate-300 group-hover:text-indigo-500" />
+            </div>
+          </section>
+
+          <section 
+            onClick={() => onNavigate('appointment')}
+            className="bg-slate-900 p-6 rounded-[2.5rem] border border-slate-800 shadow-xl flex items-center justify-between cursor-pointer hover:bg-slate-800 transition-colors group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                 <Calendar className="w-6 h-6 text-indigo-400" />
+              </div>
+              <div>
+                 <h3 className="text-sm font-bold text-white">Repair Appointment</h3>
+                 <p className="text-[10px] text-slate-400 font-medium uppercase tracking-widest mt-0.5">Book Expert • Arrival &lt; 15m</p>
+              </div>
+            </div>
+            <div className="bg-white/5 p-2 rounded-xl group-hover:bg-white/10 transition-colors">
+               <ArrowRightIcon className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" />
             </div>
           </section>
         </div>

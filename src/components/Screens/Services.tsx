@@ -7,9 +7,10 @@ interface ServicesProps {
   products: Product[];
   onAddToCart: (p: Product, q: number) => void;
   onGoToCheckout: () => void;
+  onBookAppointment: () => void;
 }
 
-export default function Services({ onBack, products, onAddToCart, onGoToCheckout }: ServicesProps) {
+export default function Services({ onBack, products, onAddToCart, onGoToCheckout, onBookAppointment }: ServicesProps) {
   const handleBook = (p: Product) => {
     onAddToCart(p, 1);
     onGoToCheckout();
@@ -130,6 +131,19 @@ export default function Services({ onBack, products, onAddToCart, onGoToCheckout
         </div>
 
         {/* Trust Section */}
+        <div className="bg-indigo-600 p-6 rounded-[2.5rem] text-white shadow-xl shadow-indigo-100 flex items-center justify-between">
+           <div>
+              <h4 className="font-bold text-lg">Heavy Repair Needed?</h4>
+              <p className="text-xs text-indigo-100 italic">Book a certified technician today</p>
+           </div>
+           <button 
+             onClick={onBookAppointment}
+             className="bg-white text-indigo-600 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest active:scale-95 transition-transform"
+           >
+              Book Now
+           </button>
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-orange-50 p-4 rounded-3xl border border-orange-100 text-center">
             <h5 className="text-[9px] font-black uppercase tracking-widest text-orange-600 mb-1">Verified Expert</h5>

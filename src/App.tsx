@@ -23,6 +23,8 @@ import PaymentMethods from './components/Screens/PaymentMethods';
 import Services from './components/Screens/Services';
 import FuelPrices from './components/Screens/FuelPrices';
 import ServiceAnalytics from './components/Screens/ServiceAnalytics';
+import AppointmentBooking from './components/Screens/AppointmentBooking';
+import RepairTracking from './components/Screens/RepairTracking';
 
 // Sample data for initial population
 const FUEL_PRODUCTS: Product[] = [
@@ -137,7 +139,7 @@ export default function App() {
       case 'parts':
         return <Store title="Vehicle Parts" products={PARTS} onBack={() => setCurrentScreen('home')} onAddToCart={addToCart} onGoToCheckout={() => setCurrentScreen('checkout')} />;
       case 'services':
-        return <Services products={SERVICES} onBack={() => setCurrentScreen('home')} onAddToCart={addToCart} onGoToCheckout={() => setCurrentScreen('checkout')} />;
+        return <Services products={SERVICES} onBack={() => setCurrentScreen('home')} onAddToCart={addToCart} onGoToCheckout={() => setCurrentScreen('checkout')} onBookAppointment={() => setCurrentScreen('appointment')} />;
       case 'checkout':
         return <Checkout cart={cart} onBack={() => setCurrentScreen('home')} onPlaceOrder={placeOrder} location={selectedLocation} />;
       case 'tracking':
@@ -162,6 +164,10 @@ export default function App() {
         return <FuelPrices onBack={() => setCurrentScreen('home')} />;
       case 'analytics':
         return <ServiceAnalytics onBack={() => setCurrentScreen('home')} />;
+      case 'appointment':
+        return <AppointmentBooking onBack={() => setCurrentScreen('home')} onBook={() => setCurrentScreen('appointment_tracking')} />;
+      case 'appointment_tracking':
+        return <RepairTracking onBack={() => setCurrentScreen('home')} />;
       default:
         return <Home onNavigate={setCurrentScreen} userPhone={user?.phone || ''} selectedLocation={selectedLocation} onLocationChange={setSelectedLocation} locations={HYDERABAD_LOCATIONS} cartCount={cart.length} />;
     }
