@@ -22,6 +22,7 @@ import DarkMode from './components/Screens/DarkMode';
 import PaymentMethods from './components/Screens/PaymentMethods';
 import Services from './components/Screens/Services';
 import FuelPrices from './components/Screens/FuelPrices';
+import ServiceAnalytics from './components/Screens/ServiceAnalytics';
 
 // Sample data for initial population
 const FUEL_PRODUCTS: Product[] = [
@@ -159,6 +160,8 @@ export default function App() {
         return <PaymentMethods onBack={() => setCurrentScreen('settings')} />;
       case 'fuelPrices':
         return <FuelPrices onBack={() => setCurrentScreen('home')} />;
+      case 'analytics':
+        return <ServiceAnalytics onBack={() => setCurrentScreen('home')} />;
       default:
         return <Home onNavigate={setCurrentScreen} userPhone={user?.phone || ''} selectedLocation={selectedLocation} onLocationChange={setSelectedLocation} locations={HYDERABAD_LOCATIONS} cartCount={cart.length} />;
     }
