@@ -27,27 +27,21 @@ import AppointmentBooking from './components/Screens/AppointmentBooking';
 import RepairTracking from './components/Screens/RepairTracking';
 
 // Sample data for initial population
+import SupabaseOrders from './components/Screens/SupabaseOrders';
+import { placeSupabaseOrder, generateDeliveryOtp, updateOrderStatus } from './services/supabase';
+
+// Sample data for initial population
 const FUEL_PRODUCTS: Product[] = [
-  { id: 'p1', name: 'Premium Petrol', price: 105, unit: 'L', description: '95 Octane high-performance fuel', image: 'https://images.unsplash.com/photo-1565026057447-bc90a3dceb87?auto=format&fit=crop&q=80&w=400', category: 'fuel' },
-  { id: 'd1', name: 'Clean Diesel', price: 92, unit: 'L', description: 'Ultra-low sulfur refined diesel', image: 'https://images.unsplash.com/photo-1610492410313-094038a83a0a?auto=format&fit=crop&q=80&w=400', category: 'fuel' },
+  { id: 'p1', name: 'Premium Petrol (95 Octane)', price: 109.66, unit: 'L', description: '95 Octane high-performance fuel with cleaning additives', image: 'https://images.unsplash.com/photo-1565026057447-bc90a3dceb87?auto=format&fit=crop&q=80&w=400', category: 'fuel' },
+  { id: 'd1', name: 'Clean Diesel (BS-VI)', price: 97.82, unit: 'L', description: 'Ultra-low sulfur refined high-speed diesel', image: 'https://images.unsplash.com/photo-1610492410313-094038a83a0a?auto=format&fit=crop&q=80&w=400', category: 'fuel' },
+  { id: 'cng1', name: 'Compressed Natural Gas (CNG)', price: 92.50, unit: 'kg', description: '200 bar compressed eco-green natural gas mobile dispatch', image: 'https://images.unsplash.com/photo-1545644161-591605335805?auto=format&fit=crop&q=80&w=400', category: 'fuel' },
+  { id: 'ev1', name: 'EV Fast Charging (Emergency Van)', price: 18.50, unit: 'kWh', description: 'Mobile DC Fast Charger 30kW CCS2 delivery to your breakdown spot', image: 'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?auto=format&fit=crop&q=80&w=400', category: 'fuel' },
 ];
 
-const PARTS: Product[] = [
-  // Car Parts
-  { id: 'oil-filter', name: 'Premium Oil Filter', price: 450, unit: 'qty', description: 'Synthetic media filter for cars', image: 'https://images.unsplash.com/photo-1486006920555-c77dcf18193b?auto=format&fit=crop&q=80&w=400', category: 'parts' },
-  { id: 'battery', name: 'Exide 75Ah Battery', price: 4500, unit: 'qty', description: 'Zero maintenance car battery', image: 'https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?auto=format&fit=crop&q=80&w=400', category: 'parts' },
-  { id: 'wiper', name: 'Bosch Wiper Blades', price: 850, unit: 'set', description: 'Frameless all-weather car wipers', image: 'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&q=80&w=400', category: 'parts' },
-  { id: 'air-filter', name: 'Car Air Filter', price: 650, unit: 'qty', description: 'High-flow intake air filter', image: 'https://images.unsplash.com/photo-1511919884226-fd3cad34687c?auto=format&fit=crop&q=80&w=400', category: 'parts' },
-  
-  // Bike Parts
-  { id: 'chain-lube', name: 'Motul Chain Lube', price: 550, unit: '300ml', description: 'Synthetic lube for bike chains', image: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=400', category: 'parts' },
-  { id: 'bike-pads', name: 'Ceramic Brake Pads', price: 1200, unit: 'set', description: 'High-performance bike brake pads', image: 'https://images.unsplash.com/photo-1581404917879-53e19259fddd?auto=format&fit=crop&q=80&w=400', category: 'parts' },
-  { id: 'spark-plug', name: 'NGK Iridium Plug', price: 850, unit: 'qty', description: 'Iridium spark plug for motorcycles', image: 'https://images.unsplash.com/photo-1605559424843-9e4c228bf1c2?auto=format&fit=crop&q=80&w=400', category: 'parts' },
-  
-  // Essentials
-  { id: 'coolant', name: 'Castrol Coolant', price: 350, unit: '1L', description: 'Anti-freeze engine coolant', image: 'https://images.unsplash.com/photo-1621905252507-b354bc2c1df5?auto=format&fit=crop&q=80&w=400', category: 'parts' },
-  { id: 'brake-fluid', name: 'DOT 4 Brake Fluid', price: 280, unit: '250ml', description: 'High boiling point brake fluid', image: 'https://images.unsplash.com/photo-1635805737707-575885ab0820?auto=format&fit=crop&q=80&w=400', category: 'parts' },
-];
+import { SPARE_PARTS_MASTER_CATALOG } from './data/sparePartsCatalog';
+
+const PARTS: Product[] = SPARE_PARTS_MASTER_CATALOG;
+
 
 const SERVICES: Product[] = [
   { id: 'jumpstart', name: 'Battery Jumpstart', price: 300, unit: 'service', description: 'On-site battery jumpstart service', image: 'https://images.unsplash.com/photo-1615906659123-23d3408667be?auto=format&fit=crop&q=80&w=400', category: 'service' },
@@ -56,11 +50,11 @@ const SERVICES: Product[] = [
 ];
 
 const HYDERABAD_LOCATIONS: UserLocation[] = [
-  { id: 'h1', name: 'Banjara Hills', address: 'Road No. 1, Banjara Hills', city: 'Hyderabad' },
-  { id: 'h2', name: 'Jubilee Hills', address: 'Road No. 36, Jubilee Hills', city: 'Hyderabad' },
-  { id: 'h3', name: 'Gachibowli', address: 'DLF Cyber City, Gachibowli', city: 'Hyderabad' },
-  { id: 'h4', name: 'Hitech City', address: 'Mindspace IT Park, Hitech City', city: 'Hyderabad' },
-  { id: 'b1', name: 'MG Road', address: 'No 42, 2nd Cross, MG Road', city: 'Bangalore' },
+  { id: 'h3', name: 'Gachibowli', address: 'DLF Cyber City, Gachibowli', city: 'Hyderabad', lat: 17.4125, lng: 78.3364 },
+  { id: 'h1', name: 'Banjara Hills', address: 'Road No. 1, Banjara Hills', city: 'Hyderabad', lat: 17.4156, lng: 78.4357 },
+  { id: 'h2', name: 'Jubilee Hills', address: 'Road No. 36, Jubilee Hills', city: 'Hyderabad', lat: 17.4319, lng: 78.4073 },
+  { id: 'h4', name: 'Hitech City', address: 'Mindspace IT Park, Hitech City', city: 'Hyderabad', lat: 17.4435, lng: 78.3772 },
+  { id: 'b1', name: 'MG Road', address: 'No 42, 2nd Cross, MG Road', city: 'Bangalore', lat: 12.9716, lng: 77.5946 },
 ];
 
 export default function App() {
@@ -110,10 +104,32 @@ export default function App() {
     });
   };
 
-  const placeOrder = (address: string, fee: number, dist: number) => {
+  const placeOrder = async (address: string, fee: number, dist: number) => {
     const total = cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0) + fee;
+    
+    // Extract fuel parameters or defaults to match schema:
+    // fuel_type: 'Diesel', litres: 100, delivery_lat: 17.4125, delivery_lng: 78.3364, status: 'PENDING', otp: '4821'
+    const fuelItem = cart.find(item => item.product.category === 'fuel');
+    const fuelType = fuelItem ? fuelItem.product.name : 'Diesel';
+    const litres = fuelItem ? fuelItem.quantity : 100;
+    const customerId = user?.phone ? `cust_${user.phone}` : 'cust_123';
+    const deliveryLat = selectedLocation.lat ?? 17.4125;
+    const deliveryLng = selectedLocation.lng ?? 78.3364;
+    const otp = generateDeliveryOtp();
+
+    // Call Supabase placeOrder
+    const supabaseRes = await placeSupabaseOrder({
+      customer_id: customerId,
+      fuel_type: fuelType,
+      litres: litres,
+      delivery_lat: deliveryLat,
+      delivery_lng: deliveryLng,
+      status: 'PENDING',
+      otp: otp,
+    });
+
     const newOrder: Order = {
-      id: `ORD-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+      id: supabaseRes.data.id || `ORD-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
       items: [...cart],
       status: 'processing',
       total,
@@ -122,11 +138,23 @@ export default function App() {
       deliveryAddress: address,
       estimatedTime: 15,
       createdAt: Date.now(),
+      customer_id: customerId,
+      fuel_type: fuelType,
+      litres: litres,
+      delivery_lat: deliveryLat,
+      delivery_lng: deliveryLng,
+      driver_lat: supabaseRes.data.driver_lat,
+      driver_lng: supabaseRes.data.driver_lng,
+      driver_speed_kmh: supabaseRes.data.driver_speed_kmh,
+      otp: otp,
+      supabase_status: 'PENDING',
+      synced_to_supabase: supabaseRes.cloudSynced,
     };
     setActiveOrder(newOrder);
     setCart([]);
     setCurrentScreen('tracking');
   };
+
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -161,13 +189,58 @@ export default function App() {
       case 'payments':
         return <PaymentMethods onBack={() => setCurrentScreen('settings')} />;
       case 'fuelPrices':
-        return <FuelPrices onBack={() => setCurrentScreen('home')} />;
+        return <FuelPrices onBack={() => setCurrentScreen('home')} onNavigate={setCurrentScreen} onAddToCart={addToCart} />;
       case 'analytics':
-        return <ServiceAnalytics onBack={() => setCurrentScreen('home')} />;
+        return <ServiceAnalytics onBack={() => setCurrentScreen('home')} onNavigate={setCurrentScreen} />;
       case 'appointment':
         return <AppointmentBooking onBack={() => setCurrentScreen('home')} onBook={() => setCurrentScreen('appointment_tracking')} />;
       case 'appointment_tracking':
         return <RepairTracking onBack={() => setCurrentScreen('home')} />;
+      case 'supabase_orders':
+        return (
+          <SupabaseOrders 
+            onBack={() => setCurrentScreen('home')} 
+            onTrackOrder={(record) => {
+              const convertedOrder: Order = {
+                id: record.id,
+                items: [
+                  {
+                    product: {
+                      id: 'fuel_stream',
+                      name: record.fuel_type,
+                      price: record.fuel_type.toLowerCase().includes('petrol') ? 105 : 92,
+                      unit: 'L',
+                      description: `${record.litres}L of ${record.fuel_type}`,
+                      image: 'https://images.unsplash.com/photo-1610492410313-094038a83a0a?auto=format&fit=crop&q=80&w=400',
+                      category: 'fuel',
+                    },
+                    quantity: record.litres,
+                  },
+                ],
+                status: record.status === 'DELIVERED' ? 'delivered' : record.status === 'DISPATCHED' ? 'dispatched' : 'processing',
+                total: record.litres * (record.fuel_type.toLowerCase().includes('petrol') ? 105 : 92),
+                deliveryFee: 49,
+                distance: 2.4,
+                deliveryAddress: 'DLF Cyber City, Gachibowli',
+                estimatedTime: 15,
+                createdAt: new Date(record.created_at).getTime(),
+                customer_id: record.customer_id,
+                fuel_type: record.fuel_type,
+                litres: record.litres,
+                delivery_lat: record.delivery_lat,
+                delivery_lng: record.delivery_lng,
+                driver_lat: record.driver_lat,
+                driver_lng: record.driver_lng,
+                driver_speed_kmh: record.driver_speed_kmh,
+                otp: record.otp,
+                supabase_status: record.status as any,
+                synced_to_supabase: record.source === 'supabase_cloud',
+              };
+              setActiveOrder(convertedOrder);
+              setCurrentScreen('tracking');
+            }}
+          />
+        );
       default:
         return <Home onNavigate={setCurrentScreen} userPhone={user?.phone || ''} selectedLocation={selectedLocation} onLocationChange={setSelectedLocation} locations={HYDERABAD_LOCATIONS} cartCount={cart.length} />;
     }

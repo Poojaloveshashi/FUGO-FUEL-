@@ -1,4 +1,4 @@
-import { ChevronLeft, User, Bell, Shield, CreditCard, HelpCircle, LogOut, ChevronRight, Moon, Globe, MapPin, History } from 'lucide-react';
+import { ChevronLeft, User, Bell, Shield, CreditCard, HelpCircle, LogOut, ChevronRight, Moon, Globe, MapPin, History, Database } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Screen } from '../../types';
 
@@ -16,6 +16,7 @@ export default function Settings({ onBack, userPhone, onLogout, onNavigate }: Se
       items: [
         { icon: User, label: 'Personal Information', value: userPhone, color: 'text-blue-500', bg: 'bg-blue-50', onClick: () => onNavigate('profile') },
         { icon: History, label: 'Order History', value: 'Recent orders', color: 'text-orange-600', bg: 'bg-orange-100', onClick: () => onNavigate('orders') },
+        { icon: Database, label: 'Supabase Database', value: 'orders table', color: 'text-emerald-600', bg: 'bg-emerald-50', onClick: () => onNavigate('supabase_orders') },
         { icon: CreditCard, label: 'Payment Methods', value: '2 Cards Saved', color: 'text-orange-500', bg: 'bg-orange-50', onClick: () => onNavigate('payments') },
         { icon: MapPin, label: 'Saved Addresses', value: '3 Locations', color: 'text-green-500', bg: 'bg-green-50', onClick: () => onNavigate('addresses') },
       ]

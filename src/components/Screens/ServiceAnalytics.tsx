@@ -18,6 +18,7 @@ import {
 
 interface ServiceAnalyticsProps {
   onBack: () => void;
+  onNavigate?: (screen: any) => void;
 }
 
 const lastWeekData = [
@@ -43,7 +44,7 @@ const categoryData = [
   { name: 'Maintenance', value: 150, color: '#64748b' },
 ];
 
-export default function ServiceAnalytics({ onBack }: ServiceAnalyticsProps) {
+export default function ServiceAnalytics({ onBack, onNavigate }: ServiceAnalyticsProps) {
   const [timeRange, setTimeRange] = useState<'week' | 'month'>('week');
 
   const data = timeRange === 'week' ? lastWeekData : lastMonthData;
@@ -64,6 +65,23 @@ export default function ServiceAnalytics({ onBack }: ServiceAnalyticsProps) {
       </header>
 
       <div className="flex-1 p-6 space-y-6 overflow-y-auto pb-24">
+        {/* Launch Budget & Inventory Shortcut */}
+        {onNavigate && (
+          <div 
+            onClick={() => onNavigate('budget')}
+            className="p-3.5 bg-gradient-to-r from-slate-900 to-orange-950 text-white rounded-2xl shadow-sm border border-orange-500/30 flex items-center justify-between cursor-pointer hover:border-orange-500 transition-colors"
+          >
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] bg-orange-500 text-black font-black px-1.5 py-0.5 rounded uppercase">Capital Plan</span>
+                <span className="text-xs font-bold text-white">Fugo Launch Budget & Inventory</span>
+              </div>
+              <p className="text-[10px] text-orange-200/80 font-mono mt-0.5">₹82.95L total • Capex vs 3-Mo Opex • 27 Staff</p>
+            </div>
+            <span className="text-xs text-orange-400 font-bold bg-white/10 px-2 py-1 rounded-lg">View &rarr;</span>
+          </div>
+        )}
+
         {/* Time Filter */}
         <div className="flex bg-white p-1 rounded-2xl shadow-sm border border-slate-100">
           <button 

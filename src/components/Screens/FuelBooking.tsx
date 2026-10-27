@@ -68,7 +68,7 @@ export default function FuelBooking({ products, onBack, onAddToCart, onGoToCheck
                    <Fuel className={`${selectedProduct.id === p.id ? 'text-white' : 'text-slate-400'} w-5 h-5`} />
                 </div>
                 <h3 className="font-bold text-sm mb-1">{p.name}</h3>
-                <p className="text-orange-600 font-bold text-lg">₹{p.price}<span className="text-[10px] text-slate-400 font-normal ml-0.5">/L</span></p>
+                <p className="text-orange-600 font-bold text-lg">₹{p.price}<span className="text-[10px] text-slate-400 font-normal ml-0.5">/{p.unit}</span></p>
                 {selectedProduct.id === p.id && (
                   <motion.div layoutId="check" className="absolute top-4 right-4 w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center">
                     <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
@@ -83,7 +83,7 @@ export default function FuelBooking({ products, onBack, onAddToCart, onGoToCheck
         <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm shadow-slate-100">
            <div className="flex justify-between items-center mb-6">
               <label className="text-[10px] uppercase tracking-widest font-bold text-slate-400">Total Quantity</label>
-              <div className="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-xs font-bold">{quantity} Litres</div>
+              <div className="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-xs font-bold">{quantity} {selectedProduct.unit}</div>
            </div>
            
            <input 
@@ -103,7 +103,7 @@ export default function FuelBooking({ products, onBack, onAddToCart, onGoToCheck
                   onClick={() => setQuantity(val)}
                   className={`py-2 rounded-xl text-sm font-bold transition-colors ${quantity === val ? 'bg-orange-500 text-white shadow-lg shadow-orange-100' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
                 >
-                  {val}L
+                  {val} {selectedProduct.unit}
                 </button>
               ))}
            </div>

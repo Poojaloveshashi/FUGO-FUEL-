@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { Fuel, User, ShoppingBag, Wrench, Navigation, Bell, MapPin, ChevronDown, TrendingUp, BarChart3, Calendar } from 'lucide-react';
+import { Fuel, User, ShoppingBag, Wrench, Navigation, Bell, MapPin, ChevronDown, TrendingUp, BarChart3, Calendar, Database, PieChart, BatteryCharging, Zap } from 'lucide-react';
 import { Screen, UserLocation } from '../../types';
 import { useState } from 'react';
 
@@ -17,7 +17,7 @@ export default function Home({ onNavigate, selectedLocation, onLocationChange, l
 
   const categories = [
     { id: 'fuel', icon: Fuel, label: 'Fuel Up', color: 'bg-orange-500', desc: 'Petrol/Diesel' },
-    { id: 'parts', icon: ShoppingBag, label: 'Spare Parts', color: 'bg-slate-900', desc: 'Engine/Body' },
+    { id: 'parts', icon: ShoppingBag, label: 'Spare Parts', color: 'bg-slate-900', desc: '64 Verified Items • Rates from ₹120' },
     { id: 'services', icon: Wrench, label: 'Service', color: 'bg-blue-600', desc: 'Puncture/Jump' },
   ];
 
@@ -108,7 +108,44 @@ export default function Home({ onNavigate, selectedLocation, onLocationChange, l
           </AnimatePresence>
         </section>
 
-
+        {/* Live Rates Ticker Banner */}
+        <section 
+          onClick={() => onNavigate('fuelPrices')}
+          className="bg-gradient-to-r from-slate-900 via-slate-900 to-orange-950 p-4 rounded-3xl text-white shadow-xl cursor-pointer border border-orange-500/30 hover:border-orange-500/60 transition-all group"
+        >
+          <div className="flex items-center justify-between gap-3 mb-2.5">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400">Live Rates • {selectedLocation.city}</span>
+            </div>
+            <div className="flex items-center gap-1 text-[10px] font-bold text-orange-400 group-hover:text-orange-300">
+              <span>View Full Rate Card</span>
+              <ArrowRightIcon className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+          </div>
+          <div className="flex items-center gap-2.5 overflow-x-auto pb-1 text-xs scrollbar-none">
+            <div className="bg-white/10 px-3 py-1.5 rounded-xl shrink-0 flex items-center gap-1.5 font-bold">
+              <span className="text-amber-400 font-black">Petrol</span>
+              <span>₹109.66/L</span>
+            </div>
+            <div className="bg-white/10 px-3 py-1.5 rounded-xl shrink-0 flex items-center gap-1.5 font-bold">
+              <span className="text-blue-400 font-black">Diesel</span>
+              <span>₹97.82/L</span>
+            </div>
+            <div className="bg-white/10 px-3 py-1.5 rounded-xl shrink-0 flex items-center gap-1.5 font-bold">
+              <span className="text-emerald-400 font-black">CNG</span>
+              <span>₹92.50/kg</span>
+            </div>
+            <div className="bg-emerald-500/20 border border-emerald-500/40 px-3 py-1.5 rounded-xl shrink-0 flex items-center gap-1.5 font-bold text-emerald-300">
+              <BatteryCharging className="w-3.5 h-3.5" />
+              <span>Battery Exch. from ₹1,100</span>
+            </div>
+            <div className="bg-cyan-500/20 border border-cyan-500/40 px-3 py-1.5 rounded-xl shrink-0 flex items-center gap-1.5 font-bold text-cyan-300">
+              <Zap className="w-3.5 h-3.5" />
+              <span>EV Fast ₹18.50/kWh</span>
+            </div>
+          </div>
+        </section>
 
         {/* Promo Banner */}
         <motion.section 
@@ -139,12 +176,36 @@ export default function Home({ onNavigate, selectedLocation, onLocationChange, l
                  <TrendingUp className="w-6 h-6 text-orange-500" />
               </div>
               <div>
-                 <h3 className="text-sm font-bold text-slate-800">Live Fuel Prices</h3>
-                 <p className="text-[10px] text-slate-400 font-medium font-mono uppercase tracking-widest mt-0.5">Petrol: ₹109.66 • Diesel: ₹97.82</p>
+                 <div className="flex items-center gap-2">
+                   <h3 className="text-sm font-bold text-slate-800">Live Fuel & Gas Rates</h3>
+                   <span className="text-[9px] bg-orange-100 text-orange-700 font-black px-1.5 py-0.5 rounded uppercase">Real-Time</span>
+                 </div>
+                 <p className="text-[10px] text-slate-400 font-medium font-mono uppercase tracking-widest mt-0.5">Petrol: ₹109.66 • Diesel: ₹97.82 • CNG: ₹92.50/kg</p>
               </div>
             </div>
             <div className="bg-slate-50 p-2 rounded-xl group-hover:bg-orange-50 transition-colors">
                <ArrowRightIcon className="w-4 h-4 text-slate-300 group-hover:text-orange-500" />
+            </div>
+          </section>
+
+          <section 
+            onClick={() => onNavigate('fuelPrices')}
+            className="bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 text-white p-6 rounded-[2.5rem] border border-emerald-500/30 shadow-lg flex items-center justify-between cursor-pointer hover:border-emerald-400/60 transition-colors group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-emerald-500/20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform border border-emerald-500/30">
+                 <BatteryCharging className="w-6 h-6 text-emerald-400" />
+              </div>
+              <div>
+                 <div className="flex items-center gap-2">
+                   <h3 className="text-sm font-bold text-white">Battery Replacement & Exchange</h3>
+                   <span className="text-[9px] bg-emerald-500 text-black font-black px-1.5 py-0.5 rounded uppercase">Save ₹1,100</span>
+                 </div>
+                 <p className="text-[10px] text-emerald-300/80 font-mono tracking-tight mt-0.5">Exide & Amaron • Instant Scrap Rebate • 15m Fitting</p>
+              </div>
+            </div>
+            <div className="bg-white/10 p-2 rounded-xl group-hover:bg-white/20 transition-colors">
+               <ArrowRightIcon className="w-4 h-4 text-emerald-300 group-hover:text-white" />
             </div>
           </section>
 
@@ -181,6 +242,27 @@ export default function Home({ onNavigate, selectedLocation, onLocationChange, l
             </div>
             <div className="bg-white/5 p-2 rounded-xl group-hover:bg-white/10 transition-colors">
                <ArrowRightIcon className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" />
+            </div>
+          </section>
+
+          <section 
+            onClick={() => onNavigate('supabase_orders')}
+            className="bg-emerald-950 text-white p-6 rounded-[2.5rem] border border-emerald-800/80 shadow-lg flex items-center justify-between cursor-pointer hover:bg-emerald-900 transition-colors group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-emerald-500/20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform border border-emerald-500/30">
+                 <Database className="w-6 h-6 text-emerald-400" />
+              </div>
+              <div>
+                 <div className="flex items-center gap-2">
+                   <h3 className="text-sm font-bold text-white">Supabase Orders</h3>
+                   <span className="text-[9px] bg-emerald-500 text-black font-black px-1.5 py-0.5 rounded uppercase">Live Table</span>
+                 </div>
+                 <p className="text-[10px] text-emerald-300/80 font-mono tracking-tight mt-0.5">placeOrder() • Lat: 17.4125, Lng: 78.3364</p>
+              </div>
+            </div>
+            <div className="bg-white/10 p-2 rounded-xl group-hover:bg-white/20 transition-colors">
+               <ArrowRightIcon className="w-4 h-4 text-emerald-300 group-hover:text-white" />
             </div>
           </section>
         </div>

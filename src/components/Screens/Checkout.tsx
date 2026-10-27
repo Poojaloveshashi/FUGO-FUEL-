@@ -6,7 +6,7 @@ import { UserLocation, Product } from '../../types';
 interface CheckoutProps {
   cart: { product: Product; quantity: number }[];
   onBack: () => void;
-  onPlaceOrder: (address: string, fee: number, dist: number) => void;
+  onPlaceOrder: (address: string, fee: number, dist: number) => Promise<void> | void;
   location: UserLocation;
 }
 
@@ -17,17 +17,23 @@ export default function Checkout({ cart, onBack, onPlaceOrder, location }: Check
   // Simulated distance to nearest station (in km)
   const distance = 0.35; // 350 meters
   const subtotal = cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
+  const totalExchangeSavings = cart.reduce((acc, item) => acc + ((item.product.exchangeDiscount || 0) * item.quantity), 0);
   
   // Dynamic Delivery Fee Logic: ₹25 if < 0.5km, else ₹49
   const deliveryFee = distance < 0.5 ? 25 : 49;
   const total = subtotal + deliveryFee;
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
     setIsPlacing(true);
-    setTimeout(() => {
-      onPlaceOrder(`${location.name}: ${location.address}, ${location.city}`, deliveryFee, distance);
-    }, 2000);
+    try {
+      await onPlaceOrder(`${location.name}: ${location.address}, ${location.city}`, deliveryFee, distance);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsPlacing(false);
+    }
   };
+
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
@@ -85,13 +91,26 @@ export default function Checkout({ cart, onBack, onPlaceOrder, location }: Check
                  <MapPin className="text-orange-500 w-5 h-5" />
               </div>
               <div className="flex-1">
-                 <h3 className="font-bold text-sm text-slate-800">{location.name}</h3>
+                 <div className="flex items-center justify-between">
+                   <h3 className="font-bold text-sm text-slate-800">{location.name}</h3>
+                   <span className="text-[10px] font-mono text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full font-bold">
+                     {location.lat ?? 17.4125}, {location.lng ?? 78.3364}
+                   </span>
+                 </div>
                  <p className="text-xs text-slate-400 leading-relaxed mt-0.5">{location.address}, {location.city}</p>
+                 <p className="text-[10px] text-slate-500 font-mono mt-1">
+                   GPS: {location.lat ?? 17.4125}° N, {location.lng ?? 78.3364}° E
+                 </p>
               </div>
            </div>
-           <div className="mt-4 pt-4 border-t border-dashed border-slate-100 flex items-center gap-3">
-              <Clock className="w-4 h-4 text-green-500" />
-              <span className="text-xs font-semibold text-slate-600">Expected Delivery in <span className="text-green-600">15 mins</span></span>
+           <div className="mt-4 pt-4 border-t border-dashed border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Clock className="w-4 h-4 text-green-500" />
+                <span className="text-xs font-semibold text-slate-600">Expected Delivery in <span className="text-green-600">15 mins</span></span>
+              </div>
+              <span className="text-[10px] font-bold text-slate-400 font-mono bg-slate-50 px-2 py-1 rounded-lg">
+                Supabase: orders table
+              </span>
            </div>
         </section>
 
@@ -102,12 +121,19 @@ export default function Checkout({ cart, onBack, onPlaceOrder, location }: Check
               {cart.map(item => (
                 <div key={item.product.id} className="flex items-center justify-between">
                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-slate-50 rounded-lg overflow-hidden">
+                      <div className="w-10 h-10 bg-slate-50 rounded-lg overflow-hidden shrink-0">
                         <img src={item.product.image} className="w-full h-full object-cover" alt="p" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-slate-800">{item.product.name}</h4>
-                        <p className="text-xs text-slate-400">{item.quantity} {item.product.unit}</p>
+                        <h4 className="text-sm font-bold text-slate-800 leading-tight">{item.product.name}</h4>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <p className="text-xs text-slate-400">{item.quantity} {item.product.unit}</p>
+                          {item.product.exchangeDiscount && (
+                            <span className="text-[9px] bg-emerald-50 text-emerald-700 font-bold px-1.5 py-0.5 rounded border border-emerald-200">
+                              -₹{item.product.exchangeDiscount * item.quantity} Scrap Discount
+                            </span>
+                          )}
+                        </div>
                       </div>
                    </div>
                    <span className="text-sm font-bold text-slate-800">₹{item.product.price * item.quantity}</span>
@@ -120,6 +146,12 @@ export default function Checkout({ cart, onBack, onPlaceOrder, location }: Check
                  <span className="text-slate-400">Subtotal</span>
                  <span className="text-slate-800 font-medium">₹{subtotal}</span>
               </div>
+              {totalExchangeSavings > 0 && (
+                <div className="flex justify-between text-sm text-emerald-600 font-bold bg-emerald-50/60 p-2 rounded-xl border border-emerald-100">
+                   <span>Scrap Battery Buyback Credit</span>
+                   <span>-₹{totalExchangeSavings}</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm">
                  <span className="text-slate-400">Delivery Fee</span>
                  <div className="flex flex-col items-end">
