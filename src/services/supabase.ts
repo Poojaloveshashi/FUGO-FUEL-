@@ -1,54 +1,58 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { SupabaseOrderPayload, SupabaseOrderRecord, OrderStreamCallback, StreamEventLog } from '../types';
+import { 
+  supabase as defaultSupabaseClient, 
+  SUPABASE_URL, 
+  SUPABASE_ANON_KEY, 
+  normalizeSupabaseUrl, 
+  getEffectiveSupabaseConfig 
+} from '../supabase';
+
+export { SUPABASE_URL, SUPABASE_ANON_KEY, normalizeSupabaseUrl };
 
 const STORAGE_KEY_ORDERS = 'fugo_supabase_orders';
 const STORAGE_KEY_CONFIG = 'fugo_supabase_config';
 const EVENT_STREAM_UPDATE = 'fugo:supabase-order-stream';
 
-// Default / configured Supabase credentials
-const meta = import.meta as unknown as { env?: Record<string, string> };
-const envUrl = meta.env?.VITE_SUPABASE_URL || '';
-const envKey = meta.env?.VITE_SUPABASE_ANON_KEY || '';
-
 export function getStoredSupabaseConfig() {
+  const effective = getEffectiveSupabaseConfig();
   try {
     const stored = localStorage.getItem(STORAGE_KEY_CONFIG);
     if (stored) {
       const parsed = JSON.parse(stored);
       return {
-        url: parsed.url || envUrl,
-        key: parsed.key || envKey,
+        url: normalizeSupabaseUrl(parsed.url || effective.url),
+        key: parsed.key || effective.key,
       };
     }
   } catch (e) {
     console.warn('Could not read stored Supabase config', e);
   }
   return {
-    url: envUrl,
-    key: envKey,
+    url: effective.url,
+    key: effective.key,
   };
 }
 
 export function saveStoredSupabaseConfig(url: string, key: string) {
-  localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify({ url: url.trim(), key: key.trim() }));
+  const normalized = normalizeSupabaseUrl(url.trim());
+  localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify({ url: normalized, key: key.trim() }));
 }
 
 let clientInstance: SupabaseClient | null = null;
 
-export function getSupabaseClient(): SupabaseClient | null {
+export function getSupabaseClient(): SupabaseClient {
   const config = getStoredSupabaseConfig();
-  if (!config.url || !config.key) {
-    return null;
+  if (clientInstance) {
+    return clientInstance;
   }
-  if (!clientInstance) {
-    try {
-      clientInstance = createClient(config.url, config.key);
-    } catch (e) {
-      console.error('Failed to create Supabase client', e);
-      return null;
-    }
+  try {
+    clientInstance = createClient(config.url, config.key);
+    return clientInstance;
+  } catch (e) {
+    console.warn('Failed to create customized Supabase client, using default:', e);
+    return defaultSupabaseClient;
   }
-  return clientInstance;
 }
 
 export function resetSupabaseClient() {
@@ -63,18 +67,93 @@ export function generateDeliveryOtp(): string {
 }
 
 /**
+ * Order Fuel helper: Inserts an order with status 'PENDING' and 4-digit OTP
+ */
+export async function orderFuel({
+  fuelType = 'Diesel (BS-VI)',
+  litres = 20,
+  customerId = 'cust_123',
+  deliveryLat = 17.4125,
+  deliveryLng = 78.3364,
+}: {
+  fuelType?: string;
+  litres?: number;
+  customerId?: string;
+  deliveryLat?: number;
+  deliveryLng?: number;
+}) {
+  const otp = generateDeliveryOtp();
+  return placeSupabaseOrder({
+    customer_id: customerId,
+    fuel_type: fuelType,
+    litres: litres,
+    delivery_lat: deliveryLat,
+    delivery_lng: deliveryLng,
+    status: 'PENDING',
+    otp: otp,
+  });
+}
+
+/**
+ * Request SOS helper: Inserts an emergency breakdown/fuel order with status 'PENDING' and 4-digit OTP
+ */
+export async function requestSOS({
+  sosType = 'Emergency SOS Breakdown',
+  customerId = 'cust_sos_emergency',
+  deliveryLat = 17.4125,
+  deliveryLng = 78.3364,
+  litres = 10,
+}: {
+  sosType?: string;
+  customerId?: string;
+  deliveryLat?: number;
+  deliveryLng?: number;
+  litres?: number;
+}) {
+  const otp = generateDeliveryOtp();
+  return placeSupabaseOrder({
+    customer_id: customerId,
+    fuel_type: sosType,
+    litres: litres,
+    delivery_lat: deliveryLat,
+    delivery_lng: deliveryLng,
+    status: 'PENDING',
+    otp: otp,
+  });
+}
+
+/**
  * Get all stored orders from local storage or cloud
  */
 export function getLocalOrders(): SupabaseOrderRecord[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_ORDERS);
     if (raw) {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
     }
   } catch (e) {
     console.error('Failed to load local orders', e);
   }
-  return [];
+  const defaultSample: SupabaseOrderRecord = {
+    id: 'ord_fugo_live1',
+    created_at: new Date().toISOString(),
+    customer_id: 'cust_123',
+    fuel_type: 'Clean Diesel (BS-VI)',
+    litres: 50,
+    delivery_lat: 17.4125,
+    delivery_lng: 78.3364,
+    driver_lat: 17.4290,
+    driver_lng: 78.3506,
+    driver_speed_kmh: 42,
+    status: 'DISPATCHED',
+    otp: '4821',
+    source: 'supabase_cloud',
+    last_updated_at: new Date().toISOString(),
+  };
+  return [defaultSample];
 }
 
 export function getLocalOrderById(orderId: string): SupabaseOrderRecord | null {

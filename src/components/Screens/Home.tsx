@@ -1,5 +1,24 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { Fuel, User, ShoppingBag, Wrench, Navigation, Bell, MapPin, ChevronDown, TrendingUp, BarChart3, Calendar, Database, PieChart, BatteryCharging, Zap } from 'lucide-react';
+import { 
+  Fuel, 
+  User, 
+  ShoppingBag, 
+  Wrench, 
+  Navigation, 
+  Bell, 
+  MapPin, 
+  ChevronDown, 
+  TrendingUp, 
+  BarChart3, 
+  Calendar, 
+  Database, 
+  PieChart, 
+  BatteryCharging, 
+  Zap,
+  AlertTriangle,
+  ShieldAlert,
+  ArrowRight
+} from 'lucide-react';
 import { Screen, UserLocation } from '../../types';
 import { useState } from 'react';
 
@@ -10,9 +29,19 @@ interface HomeProps {
   onLocationChange: (loc: UserLocation) => void;
   locations: UserLocation[];
   cartCount: number;
+  onRequestSOS?: () => void;
+  onOrderFuel?: () => void;
 }
 
-export default function Home({ onNavigate, selectedLocation, onLocationChange, locations, cartCount }: HomeProps) {
+export default function Home({ 
+  onNavigate, 
+  selectedLocation, 
+  onLocationChange, 
+  locations, 
+  cartCount,
+  onRequestSOS,
+  onOrderFuel 
+}: HomeProps) {
   const [showLocations, setShowLocations] = useState(false);
 
   const categories = [
@@ -164,6 +193,54 @@ export default function Home({ onNavigate, selectedLocation, onLocationChange, l
             <p className="text-white/80 text-sm mt-1">15-Minute delivery guaranteed from nearest station</p>
           </div>
         </motion.section>
+
+        {/* Core Direct Action Triggers: Order Fuel & Request SOS */}
+        <section className="grid grid-cols-2 gap-3.5">
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={() => {
+              if (onOrderFuel) onOrderFuel();
+              else onNavigate('fuel');
+            }}
+            className="bg-gradient-to-br from-orange-500 to-amber-600 text-white p-4 rounded-3xl shadow-lg shadow-orange-500/20 text-left flex flex-col justify-between group border border-orange-400/40 relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-8 -mt-8 pointer-events-none" />
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center">
+                <Fuel className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-[9px] bg-black/20 text-white font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                15m Express
+              </span>
+            </div>
+            <div>
+              <h3 className="font-black text-base leading-tight">Order Fuel</h3>
+              <p className="text-[11px] text-white/80 mt-0.5">Petrol & Diesel Dispatch</p>
+            </div>
+          </motion.button>
+
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={() => {
+              if (onRequestSOS) onRequestSOS();
+            }}
+            className="bg-gradient-to-br from-red-600 via-rose-600 to-red-700 text-white p-4 rounded-3xl shadow-lg shadow-red-600/30 text-left flex flex-col justify-between group border border-red-500/50 relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-8 -mt-8 pointer-events-none" />
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-white animate-pulse" />
+              </div>
+              <span className="text-[9px] bg-white text-red-600 font-black px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
+                Emergency
+              </span>
+            </div>
+            <div>
+              <h3 className="font-black text-base leading-tight">Request SOS</h3>
+              <p className="text-[11px] text-white/80 mt-0.5">Instant Breakdown Rescue</p>
+            </div>
+          </motion.button>
+        </section>
 
         {/* Dashboard Widgets */}
         <div className="grid grid-cols-1 gap-4">

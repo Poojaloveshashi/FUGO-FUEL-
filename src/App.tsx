@@ -26,8 +26,8 @@ import ServiceAnalytics from './components/Screens/ServiceAnalytics';
 import AppointmentBooking from './components/Screens/AppointmentBooking';
 import RepairTracking from './components/Screens/RepairTracking';
 
-// Sample data for initial population
 import SupabaseOrders from './components/Screens/SupabaseOrders';
+import SOSModal from './components/Screens/SOSModal';
 import { placeSupabaseOrder, generateDeliveryOtp, updateOrderStatus } from './services/supabase';
 
 // Sample data for initial population
@@ -58,11 +58,13 @@ const HYDERABAD_LOCATIONS: UserLocation[] = [
 ];
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('login');
-  const [user, setUser] = useState<{ phone: string } | null>(null);
+  const [currentScreen, setCurrentScreen] = useState<Screen>('home');
+  const [user, setUser] = useState<{ phone: string } | null>({ phone: '+91 98765 43210' });
   const [cart, setCart] = useState<{ product: Product; quantity: number }[]>([]);
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<UserLocation>(HYDERABAD_LOCATIONS[0]);
+
+  const [isSosModalOpen, setIsSosModalOpen] = useState(false);
 
   // Authentication persistence simulation
   useEffect(() => {
@@ -72,12 +74,12 @@ export default function App() {
         const parsed = JSON.parse(savedUser);
         if (parsed && parsed.phone) {
           setUser(parsed);
-          setCurrentScreen('home');
         }
+      } else {
+        localStorage.setItem('fugo_user', JSON.stringify({ phone: '+91 98765 43210' }));
       }
     } catch (e) {
       console.error('Failed to load user', e);
-      localStorage.removeItem('fugo_user');
     }
   }, []);
 
@@ -102,6 +104,113 @@ export default function App() {
       }
       return [...prev, { product, quantity }];
     });
+  };
+
+  // Direct "Order Fuel" handler with status 'PENDING', 4-digit OTP, and immediate real-time tracking
+  const handleOrderFuelDirect = async (product: Product, quantity: number) => {
+    const customerId = user?.phone ? `cust_${user.phone}` : 'cust_123';
+    const deliveryLat = selectedLocation.lat ?? 17.4125;
+    const deliveryLng = selectedLocation.lng ?? 78.3364;
+    const otp = generateDeliveryOtp();
+    const deliveryFee = 25;
+    const total = (product.price * quantity) + deliveryFee;
+
+    const supabaseRes = await placeSupabaseOrder({
+      customer_id: customerId,
+      fuel_type: product.name,
+      litres: quantity,
+      delivery_lat: deliveryLat,
+      delivery_lng: deliveryLng,
+      status: 'PENDING',
+      otp: otp,
+    });
+
+    const newOrder: Order = {
+      id: supabaseRes.data.id || `ORD-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+      items: [{ product, quantity }],
+      status: 'processing',
+      total,
+      deliveryFee,
+      distance: 0.35,
+      deliveryAddress: `${selectedLocation.name}: ${selectedLocation.address}, ${selectedLocation.city}`,
+      estimatedTime: 15,
+      createdAt: Date.now(),
+      customer_id: customerId,
+      fuel_type: product.name,
+      litres: quantity,
+      delivery_lat: deliveryLat,
+      delivery_lng: deliveryLng,
+      driver_lat: supabaseRes.data.driver_lat,
+      driver_lng: supabaseRes.data.driver_lng,
+      driver_speed_kmh: supabaseRes.data.driver_speed_kmh,
+      otp: otp,
+      supabase_status: 'PENDING',
+      synced_to_supabase: supabaseRes.cloudSynced,
+    };
+    setActiveOrder(newOrder);
+    setCurrentScreen('tracking');
+  };
+
+  // Direct "Request SOS" handler with status 'PENDING', 4-digit OTP, and immediate real-time tracking
+  const handleRequestSOS = async (
+    sosTitle: string = 'Emergency Roadside SOS',
+    fuelType: string = 'Emergency Fuel Rescue',
+    litres: number = 10
+  ) => {
+    const customerId = user?.phone ? `cust_sos_${user.phone}` : 'cust_sos_emergency';
+    const deliveryLat = selectedLocation.lat ?? 17.4125;
+    const deliveryLng = selectedLocation.lng ?? 78.3364;
+    const otp = generateDeliveryOtp();
+    const total = 450; // Flat roadside rescue fee
+
+    const supabaseRes = await placeSupabaseOrder({
+      customer_id: customerId,
+      fuel_type: `${sosTitle}: ${fuelType}`,
+      litres: litres || 10,
+      delivery_lat: deliveryLat,
+      delivery_lng: deliveryLng,
+      status: 'PENDING',
+      otp: otp,
+    });
+
+    const newOrder: Order = {
+      id: supabaseRes.data.id || `SOS-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+      items: [
+        {
+          product: {
+            id: 'sos_emergency_item',
+            name: `${sosTitle} - ${fuelType}`,
+            price: total,
+            unit: 'SOS',
+            description: `Priority breakdown rescue at ${selectedLocation.name}`,
+            image: 'https://images.unsplash.com/photo-1615906659123-23d3408667be?auto=format&fit=crop&q=80&w=400',
+            category: 'service',
+          },
+          quantity: 1,
+        },
+      ],
+      status: 'processing',
+      total,
+      deliveryFee: 0,
+      distance: 0.25,
+      deliveryAddress: `EMERGENCY SOS: ${selectedLocation.name}, ${selectedLocation.address}`,
+      estimatedTime: 12,
+      createdAt: Date.now(),
+      customer_id: customerId,
+      fuel_type: `${sosTitle}: ${fuelType}`,
+      litres: litres || 10,
+      delivery_lat: deliveryLat,
+      delivery_lng: deliveryLng,
+      driver_lat: supabaseRes.data.driver_lat,
+      driver_lng: supabaseRes.data.driver_lng,
+      driver_speed_kmh: supabaseRes.data.driver_speed_kmh,
+      otp: otp,
+      supabase_status: 'PENDING',
+      synced_to_supabase: supabaseRes.cloudSynced,
+    };
+    setActiveOrder(newOrder);
+    setIsSosModalOpen(false);
+    setCurrentScreen('tracking');
   };
 
   const placeOrder = async (address: string, fee: number, dist: number) => {
@@ -155,19 +264,47 @@ export default function App() {
     setCurrentScreen('tracking');
   };
 
-
   const renderScreen = () => {
     switch (currentScreen) {
       case 'login':
         return <Login onLogin={handleLogin} />;
       case 'home':
-        return <Home onNavigate={setCurrentScreen} userPhone={user?.phone || ''} selectedLocation={selectedLocation} onLocationChange={setSelectedLocation} locations={HYDERABAD_LOCATIONS} cartCount={cart.length} />;
+        return (
+          <Home 
+            onNavigate={setCurrentScreen} 
+            userPhone={user?.phone || ''} 
+            selectedLocation={selectedLocation} 
+            onLocationChange={setSelectedLocation} 
+            locations={HYDERABAD_LOCATIONS} 
+            cartCount={cart.length}
+            onRequestSOS={() => setIsSosModalOpen(true)}
+            onOrderFuel={() => setCurrentScreen('fuel')}
+          />
+        );
       case 'fuel':
-        return <FuelBooking products={FUEL_PRODUCTS} onBack={() => setCurrentScreen('home')} onAddToCart={addToCart} onGoToCheckout={() => setCurrentScreen('checkout')} location={selectedLocation} />;
+        return (
+          <FuelBooking 
+            products={FUEL_PRODUCTS} 
+            onBack={() => setCurrentScreen('home')} 
+            onAddToCart={addToCart} 
+            onGoToCheckout={() => setCurrentScreen('checkout')} 
+            onOrderFuelDirect={handleOrderFuelDirect}
+            location={selectedLocation} 
+          />
+        );
       case 'parts':
         return <Store title="Vehicle Parts" products={PARTS} onBack={() => setCurrentScreen('home')} onAddToCart={addToCart} onGoToCheckout={() => setCurrentScreen('checkout')} />;
       case 'services':
-        return <Services products={SERVICES} onBack={() => setCurrentScreen('home')} onAddToCart={addToCart} onGoToCheckout={() => setCurrentScreen('checkout')} onBookAppointment={() => setCurrentScreen('appointment')} />;
+        return (
+          <Services 
+            products={SERVICES} 
+            onBack={() => setCurrentScreen('home')} 
+            onAddToCart={addToCart} 
+            onGoToCheckout={() => setCurrentScreen('checkout')} 
+            onBookAppointment={() => setCurrentScreen('appointment')} 
+            onRequestSOS={() => setIsSosModalOpen(true)}
+          />
+        );
       case 'checkout':
         return <Checkout cart={cart} onBack={() => setCurrentScreen('home')} onPlaceOrder={placeOrder} location={selectedLocation} />;
       case 'tracking':
@@ -242,7 +379,18 @@ export default function App() {
           />
         );
       default:
-        return <Home onNavigate={setCurrentScreen} userPhone={user?.phone || ''} selectedLocation={selectedLocation} onLocationChange={setSelectedLocation} locations={HYDERABAD_LOCATIONS} cartCount={cart.length} />;
+        return (
+          <Home 
+            onNavigate={setCurrentScreen} 
+            userPhone={user?.phone || ''} 
+            selectedLocation={selectedLocation} 
+            onLocationChange={setSelectedLocation} 
+            locations={HYDERABAD_LOCATIONS} 
+            cartCount={cart.length}
+            onRequestSOS={() => setIsSosModalOpen(true)}
+            onOrderFuel={() => setCurrentScreen('fuel')}
+          />
+        );
     }
   };
 
@@ -260,6 +408,14 @@ export default function App() {
           {renderScreen()}
         </motion.div>
       </AnimatePresence>
+
+      {/* Emergency SOS Breakdown Modal */}
+      <SOSModal
+        isOpen={isSosModalOpen}
+        onClose={() => setIsSosModalOpen(false)}
+        onRequestSOS={handleRequestSOS}
+        location={selectedLocation}
+      />
     </div>
   );
 }

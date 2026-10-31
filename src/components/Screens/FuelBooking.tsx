@@ -8,20 +8,40 @@ interface FuelBookingProps {
   onBack: () => void;
   onAddToCart: (p: Product, q: number) => void;
   onGoToCheckout: () => void;
+  onOrderFuelDirect?: (p: Product, q: number) => Promise<void> | void;
   location: UserLocation;
 }
 
-export default function FuelBooking({ products, onBack, onAddToCart, onGoToCheckout, location }: FuelBookingProps) {
+export default function FuelBooking({ 
+  products, 
+  onBack, 
+  onAddToCart, 
+  onGoToCheckout, 
+  onOrderFuelDirect,
+  location 
+}: FuelBookingProps) {
   const [selectedProduct, setSelectedProduct] = useState<Product>(products[0]);
   const [quantity, setQuantity] = useState(10);
-  const [added, setAdded] = useState(false);
+  const [isOrdering, setIsOrdering] = useState(false);
 
-  const handleAdd = () => {
+  const handleOrderFuel = async () => {
+    setIsOrdering(true);
+    try {
+      if (onOrderFuelDirect) {
+        await onOrderFuelDirect(selectedProduct, quantity);
+      } else {
+        onAddToCart(selectedProduct, quantity);
+        onGoToCheckout();
+      }
+    } catch (e) {
+      console.error('Order Fuel failed', e);
+      setIsOrdering(false);
+    }
+  };
+
+  const handleAddToCartOnly = () => {
     onAddToCart(selectedProduct, quantity);
-    setAdded(true);
-    setTimeout(() => {
-      onGoToCheckout();
-    }, 800);
+    onGoToCheckout();
   };
 
   return (
@@ -128,29 +148,49 @@ export default function FuelBooking({ products, onBack, onAddToCart, onGoToCheck
       </div>
 
       {/* Footer Payment Info */}
-      <footer className="p-6 bg-white border-t border-slate-100 mt-auto">
-        <div className="flex items-center justify-between mb-4">
+      <footer className="p-6 bg-white border-t border-slate-100 mt-auto space-y-3">
+        <div className="flex items-center justify-between mb-2">
            <div>
               <p className="text-xs text-slate-400 font-medium">Total Amount</p>
               <h2 className="text-2xl font-bold text-slate-900">₹{(quantity * selectedProduct.price).toLocaleString()}</h2>
            </div>
-           <p className="text-[10px] text-slate-400 text-right font-medium">Includes delivery fee <br /> & taxes</p>
+           <p className="text-[10px] text-slate-400 text-right font-medium">Includes delivery fee <br /> & tamper-proof seal</p>
         </div>
         
+        {/* Main "Order Fuel" CTA */}
         <button
-          onClick={handleAdd}
-          disabled={added}
-          className={`w-full py-5 rounded-2xl font-bold shadow-lg transition-all flex items-center justify-center gap-2 group ${
-            added ? 'bg-green-500 text-white shadow-green-100' : 'bg-orange-500 text-white shadow-orange-100 hover:bg-orange-600 active:scale-[0.98]'
+          onClick={handleOrderFuel}
+          disabled={isOrdering}
+          className={`w-full py-4.5 rounded-2xl font-black text-sm uppercase tracking-wider shadow-xl transition-all flex items-center justify-center gap-2 group ${
+            isOrdering 
+              ? 'bg-slate-900 text-white cursor-wait' 
+              : 'bg-orange-500 text-white shadow-orange-200 hover:bg-orange-600 active:scale-[0.98]'
           }`}
         >
-          {added ? (
-            <>Success! Redirecting...</>
+          {isOrdering ? (
+            <>
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+                className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
+              />
+              <span>Inserting Order & Connecting Live Stream...</span>
+            </>
           ) : (
             <>
-              Confirm Order & Pay <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              <Fuel className="w-4 h-4" />
+              <span>Order Fuel ({quantity}{selectedProduct.unit})</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </>
           )}
+        </button>
+
+        <button
+          onClick={handleAddToCartOnly}
+          disabled={isOrdering}
+          className="w-full py-2.5 text-xs text-slate-500 font-bold hover:text-slate-800 transition-colors text-center"
+        >
+          Add to Cart & Combine with Spare Parts
         </button>
       </footer>
     </div>

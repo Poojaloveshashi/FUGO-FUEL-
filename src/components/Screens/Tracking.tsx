@@ -50,7 +50,8 @@ function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2:
 export default function Tracking({ order, onBack }: TrackingProps) {
   const [timeLeft, setTimeLeft] = useState(15 * 60); // 15 mins default
   const [streamOrder, setStreamOrder] = useState<SupabaseOrderRecord | null>(null);
-  const [status, setStatus] = useState<'processing' | 'dispatched' | 'nearby' | 'delivered'>('processing');
+  const [status, setStatus] = useState<'pending' | 'processing' | 'dispatched' | 'nearby' | 'delivered'>('pending');
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
   
   // Realtime GPS telemetry
   const destLat = order?.delivery_lat ?? 17.4125;
@@ -98,6 +99,8 @@ export default function Tracking({ order, onBack }: TrackingProps) {
           } else {
             setStatus('dispatched');
           }
+        } else if (updatedRecord.status === 'PENDING') {
+          setStatus('pending');
         } else {
           setStatus('processing');
         }
@@ -365,14 +368,16 @@ export default function Tracking({ order, onBack }: TrackingProps) {
             </p>
           </div>
           <div className="text-right">
-            <span className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest ${
+            <span className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest ${
               status === 'delivered' 
                 ? 'bg-emerald-100 text-emerald-700' 
                 : status === 'nearby'
-                ? 'bg-amber-100 text-amber-800 animate-pulse'
-                : 'bg-orange-100 text-orange-700'
+                ? 'bg-purple-100 text-purple-800 animate-pulse'
+                : status === 'dispatched'
+                ? 'bg-orange-100 text-orange-700'
+                : 'bg-amber-100 text-amber-800 animate-pulse'
             }`}>
-              {status}
+              {status === 'pending' ? 'PENDING' : status}
             </span>
           </div>
         </div>
@@ -460,19 +465,42 @@ export default function Tracking({ order, onBack }: TrackingProps) {
           </div>
           <div className="flex gap-2">
             <button 
-              onClick={() => window.open('tel:+919876543210')}
+              onClick={() => {
+                setActionNotice('Calling driver Rahul (+91 98765 43210)...');
+                setTimeout(() => setActionNotice(null), 3000);
+              }}
               className="w-10 h-10 bg-white shadow-sm border border-slate-100 rounded-xl flex items-center justify-center text-orange-500 hover:bg-orange-50 transition-colors"
+              title="Call driver"
             >
               <Phone className="w-4 h-4" />
             </button>
             <button 
-              onClick={() => alert('Message sent to agent: Rahul')}
+              onClick={() => {
+                setActionNotice('Direct dispatch message sent to Rahul');
+                setTimeout(() => setActionNotice(null), 3000);
+              }}
               className="w-10 h-10 bg-white shadow-sm border border-slate-100 rounded-xl flex items-center justify-center text-blue-500 hover:bg-blue-50 transition-colors"
+              title="Message driver"
             >
               <MessageSquare className="w-4 h-4" />
             </button>
           </div>
         </section>
+
+        {/* Action Notice Toast */}
+        <AnimatePresence>
+          {actionNotice && (
+            <motion.div
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -5 }}
+              className="bg-slate-900 text-white text-xs font-bold py-2.5 px-4 rounded-2xl flex items-center justify-between"
+            >
+              <span>{actionNotice}</span>
+              <button onClick={() => setActionNotice(null)} className="text-slate-400 hover:text-white text-xs">✕</button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Progress Pipeline */}
         <section className="space-y-4">

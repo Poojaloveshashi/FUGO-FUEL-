@@ -1,4 +1,4 @@
-import { ChevronLeft, Wrench, Shield, Zap, Droplets, MapPin, Clock, Star, PhoneCall } from 'lucide-react';
+import { ChevronLeft, Wrench, Shield, Zap, Droplets, MapPin, Clock, Star, PhoneCall, AlertTriangle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Product } from '../../types';
 
@@ -8,9 +8,17 @@ interface ServicesProps {
   onAddToCart: (p: Product, q: number) => void;
   onGoToCheckout: () => void;
   onBookAppointment: () => void;
+  onRequestSOS?: () => void;
 }
 
-export default function Services({ onBack, products, onAddToCart, onGoToCheckout, onBookAppointment }: ServicesProps) {
+export default function Services({ 
+  onBack, 
+  products, 
+  onAddToCart, 
+  onGoToCheckout, 
+  onBookAppointment,
+  onRequestSOS 
+}: ServicesProps) {
   const handleBook = (p: Product) => {
     onAddToCart(p, 1);
     onGoToCheckout();
@@ -55,11 +63,20 @@ export default function Services({ onBack, products, onAddToCart, onGoToCheckout
           <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/20 blur-3xl rounded-full -mr-16 -mt-16" />
           <div className="relative z-10">
             <h2 className="text-xl font-bold mb-2">Need immediate help?</h2>
-            <p className="text-sm text-slate-400 mb-6 max-w-[200px]">Our experts reach you in under 15 minutes anywhere in Hyderabad.</p>
-            <button className="bg-white text-slate-900 px-6 py-2.5 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 active:scale-95 transition-transform">
-              <PhoneCall className="w-3.5 h-3.5" />
-              Call Support
-            </button>
+            <p className="text-sm text-slate-400 mb-5 max-w-[220px]">Our experts reach you in under 15 minutes anywhere in Hyderabad.</p>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={onRequestSOS}
+                className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 active:scale-95 transition-transform shadow-lg shadow-red-600/30"
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Request SOS
+              </button>
+              <button className="bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 active:scale-95 transition-transform">
+                <PhoneCall className="w-3.5 h-3.5" />
+                Call Support
+              </button>
+            </div>
           </div>
           <motion.div 
             animate={{ rotate: 360 }}
