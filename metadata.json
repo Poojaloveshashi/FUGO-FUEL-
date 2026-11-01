@@ -2,5 +2,5 @@
   "name": "Fugo Fuel",
   "description": "On-demand fuel delivery, vehicle parts, and emergency services in 15 minutes. Real-time tracking and secure payment options for all your automotive needs.",
   "requestFramePermissions": ["geolocation"],
-  "majorCapabilities": []
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

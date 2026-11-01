@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Screen, Product, Order, UserLocation } from './types';
+import { Screen, Product, Order, UserLocation, PaymentTransactionInfo } from './types';
 import Login from './components/Screens/Login';
 import Home from './components/Screens/Home';
 import FuelBooking from './components/Screens/FuelBooking';
@@ -213,7 +213,7 @@ export default function App() {
     setCurrentScreen('tracking');
   };
 
-  const placeOrder = async (address: string, fee: number, dist: number) => {
+  const placeOrder = async (address: string, fee: number, dist: number, payment?: PaymentTransactionInfo) => {
     const total = cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0) + fee;
     
     // Extract fuel parameters or defaults to match schema:
@@ -258,6 +258,7 @@ export default function App() {
       otp: otp,
       supabase_status: 'PENDING',
       synced_to_supabase: supabaseRes.cloudSynced,
+      payment: payment,
     };
     setActiveOrder(newOrder);
     setCart([]);

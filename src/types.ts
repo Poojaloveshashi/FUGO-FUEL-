@@ -61,6 +61,26 @@ export interface StreamEventLog {
 
 export type OrderStreamCallback = (data: SupabaseOrderRecord, event?: StreamEventLog) => void;
 
+export interface PaymentTransactionInfo {
+  method: 'upi' | 'card' | 'netbanking' | 'wallet' | 'pod';
+  methodTitle: string;
+  transactionId: string;
+  rrn: string; // Retrieval Reference Number (Bank RRN)
+  authCode: string;
+  paidAt: string;
+  status: 'PAID' | 'PENDING_ON_DELIVERY';
+  amount: number;
+  subtotal: number;
+  deliveryFee: number;
+  gstAmount: number;
+  invoiceNumber: string;
+  cardLast4?: string;
+  cardBrand?: string;
+  upiVpa?: string;
+  bankName?: string;
+  walletName?: string;
+}
+
 export interface Order {
   id: string;
   items: { product: Product; quantity: number }[];
@@ -84,5 +104,7 @@ export interface Order {
   supabase_status: 'PENDING' | 'DISPATCHED' | 'DELIVERED';
   synced_to_supabase: boolean;
   last_updated_at?: string;
+  payment?: PaymentTransactionInfo;
 }
+
 

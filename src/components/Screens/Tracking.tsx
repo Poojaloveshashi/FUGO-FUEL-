@@ -20,7 +20,9 @@ import {
   Pause, 
   FastForward, 
   CheckCircle2,
-  Share2
+  Share2,
+  Receipt,
+  CreditCard
 } from 'lucide-react';
 import { Order, StreamEventLog, SupabaseOrderRecord } from '../../types';
 import { 
@@ -28,6 +30,7 @@ import {
   updateOrderStatus, 
   updateDriverLocation 
 } from '../../services/supabase';
+import PaymentReceiptModal from '../Payment/PaymentReceiptModal';
 
 interface TrackingProps {
   order: Order | null;
@@ -63,6 +66,7 @@ export default function Tracking({ order, onBack }: TrackingProps) {
   const [showLogs, setShowLogs] = useState(false);
   const [simSpeed, setSimSpeed] = useState<number>(1);
   const [isSimPaused, setIsSimPaused] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
   // Subscribe to real-time Supabase stream matching user's Flutter/Dart pattern:
   // Supabase.instance.client.from('orders').stream(primaryKey: ['id']).eq('id', activeOrderId).listen(...)
@@ -430,6 +434,36 @@ export default function Tracking({ order, onBack }: TrackingProps) {
             </div>
           </div>
         </section>
+        
+        {/* Verified Payment Summary */}
+        {order.payment && (
+          <section className="bg-emerald-50/70 border border-emerald-200/80 p-4 rounded-3xl flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shadow-md shadow-emerald-200 shrink-0">
+                <Receipt className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-slate-900">
+                    {order.payment.status === 'PAID' ? 'Payment Verified' : 'Pay on Delivery'}
+                  </span>
+                  <span className="text-[9px] font-mono font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-300">
+                    {order.payment.status}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  {order.payment.methodTitle} • ₹{order.payment.amount}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowInvoiceModal(true)}
+              className="px-3 py-1.5 bg-white border border-emerald-300 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl shadow-xs transition-colors shrink-0"
+            >
+              Tax Invoice
+            </button>
+          </section>
+        )}
 
         {/* Quick Simulation Controls */}
         {status !== 'delivered' && (
@@ -565,6 +599,18 @@ export default function Tracking({ order, onBack }: TrackingProps) {
         <p className="text-center text-[10px] text-slate-300 font-bold uppercase tracking-[0.2em] pt-2">
           Order ID: {order.id}
         </p>
+
+        {/* Viewable Tax Invoice Modal from Live Tracking Screen */}
+        {showInvoiceModal && order.payment && (
+          <PaymentReceiptModal
+            isOpen={showInvoiceModal}
+            orderId={order.id}
+            items={order.items}
+            deliveryAddress={order.deliveryAddress}
+            payment={order.payment}
+            onProceedToTracking={() => setShowInvoiceModal(false)}
+          />
+        )}
       </div>
     </div>
   );

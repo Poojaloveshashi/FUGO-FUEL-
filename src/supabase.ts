@@ -1,36 +1,91 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-/**
- * Hardcoded Supabase Configuration Fallback Strings
- * Project Reference: arierwpjaksxxnmvbqwn
- * Cloud Region: ap-southeast-1
- */
+// Fallback project configuration
 export const SUPABASE_PROJECT_REF = 'arierwpjaksxxnmvbqwn';
-export const SUPABASE_URL = 'https://arierwpjaksxxnmvbqwn.supabase.co';
-export const SUPABASE_ANON_KEY = 'ap-southeast-1';
+export const DEFAULT_FALLBACK_URL = 'https://your-project-id.supabase.co';
+export const DEFAULT_FALLBACK_KEY = 'ap-southeast-1';
 
 /**
- * Normalizes any provided URL or project reference into a full valid Supabase URL
+ * Normalizes and validates any URL or project ID into a valid HTTP/HTTPS URL
  */
 export function normalizeSupabaseUrl(input?: string): string {
-  if (!input || typeof input !== 'string') return SUPABASE_URL;
+  if (!input || typeof input !== 'string') return DEFAULT_FALLBACK_URL;
   const trimmed = input.trim();
-  if (!trimmed || trimmed === 'YOUR_SUPABASE_URL') return SUPABASE_URL;
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+  if (
+    !trimmed || 
+    trimmed === 'YOUR_SUPABASE_URL' || 
+    trimmed === 'undefined' || 
+    trimmed === 'null' ||
+    trimmed === 'YOUR_SUPABASE_URL_HERE'
+  ) {
+    return DEFAULT_FALLBACK_URL;
+  }
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    try {
+      const parsed = new URL(trimmed);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        return trimmed;
+      }
+    } catch {
+      return DEFAULT_FALLBACK_URL;
+    }
+  }
   if (/^[a-z0-9_-]+$/i.test(trimmed)) {
     return `https://${trimmed}.supabase.co`;
   }
-  return `https://${trimmed}`;
+  return DEFAULT_FALLBACK_URL;
 }
 
 /**
- * Resolves the effective Supabase config using hardcoded fallback strings
+ * Normalizes and validates anon key
+ */
+export function normalizeSupabaseKey(input?: string): string {
+  if (!input || typeof input !== 'string') return DEFAULT_FALLBACK_KEY;
+  const trimmed = input.trim();
+  if (
+    !trimmed || 
+    trimmed === 'YOUR_SUPABASE_ANON_KEY' || 
+    trimmed === 'undefined' || 
+    trimmed === 'null'
+  ) {
+    return DEFAULT_FALLBACK_KEY;
+  }
+  return trimmed;
+}
+
+// Safely determine initial URL and Key from environment or defaults
+const envUrl = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_SUPABASE_URL;
+const envKey = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_SUPABASE_ANON_KEY;
+
+const supabaseUrl = normalizeSupabaseUrl(envUrl);
+const supabaseAnonKey = normalizeSupabaseKey(envKey);
+
+/**
+ * Create Supabase client safely with catch fallback to ensure the app never crashes
+ */
+function createSafeSupabaseClient(url: string, key: string): SupabaseClient {
+  try {
+    return createClient(url, key);
+  } catch (err) {
+    console.warn('[Supabase] Warning: initial client initialization with configured URL failed, falling back to safe URL:', err);
+    try {
+      return createClient(DEFAULT_FALLBACK_URL, DEFAULT_FALLBACK_KEY);
+    } catch (fallbackErr) {
+      console.error('[Supabase] Critical error initializing fallback client:', fallbackErr);
+      return createClient('https://your-project-id.supabase.co', 'ap-southeast-1');
+    }
+  }
+}
+
+export const supabase: SupabaseClient = createSafeSupabaseClient(supabaseUrl, supabaseAnonKey);
+
+export const SUPABASE_URL = supabaseUrl;
+export const SUPABASE_ANON_KEY = supabaseAnonKey;
+
+/**
+ * Resolves the effective Supabase config using stored localStorage or environment fallback strings
  */
 export function getEffectiveSupabaseConfig(): { url: string; key: string } {
-  const meta = import.meta as unknown as { env?: Record<string, string> };
-  const envUrl = meta.env?.VITE_SUPABASE_URL;
-  const envKey = meta.env?.VITE_SUPABASE_ANON_KEY;
-
   let storedUrl = '';
   let storedKey = '';
 
@@ -47,12 +102,11 @@ export function getEffectiveSupabaseConfig(): { url: string; key: string } {
     // Graceful fallback
   }
 
-  const rawUrl = storedUrl || envUrl || SUPABASE_URL;
+  const rawUrl = storedUrl || envUrl;
   const finalUrl = normalizeSupabaseUrl(rawUrl);
 
-  const finalKey = (storedKey && storedKey !== 'YOUR_SUPABASE_ANON_KEY')
-    ? storedKey
-    : (envKey && envKey !== 'YOUR_SUPABASE_ANON_KEY' ? envKey : SUPABASE_ANON_KEY);
+  const rawKey = storedKey || envKey;
+  const finalKey = normalizeSupabaseKey(rawKey);
 
   return {
     url: finalUrl,
@@ -60,11 +114,5 @@ export function getEffectiveSupabaseConfig(): { url: string; key: string } {
   };
 }
 
-const config = getEffectiveSupabaseConfig();
-
-/**
- * Main exportable Supabase client instance with hardcoded fallback configuration
- */
-export const supabase: SupabaseClient = createClient(config.url, config.key);
-
 export default supabase;
+
