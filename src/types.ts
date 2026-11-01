@@ -7,7 +7,7 @@ export interface UserLocation {
   lng: number;
 }
 
-export type Screen = 'login' | 'home' | 'fuel' | 'parts' | 'services' | 'checkout' | 'tracking' | 'settings' | 'notifications' | 'orders' | 'addresses' | 'profile' | 'language' | 'darkMode' | 'payments' | 'fuelPrices' | 'analytics' | 'appointment' | 'appointment_tracking' | 'supabase_orders';
+export type Screen = 'login' | 'home' | 'fuel' | 'parts' | 'services' | 'checkout' | 'tracking' | 'settings' | 'notifications' | 'orders' | 'addresses' | 'profile' | 'language' | 'darkMode' | 'payments' | 'fuelPrices' | 'analytics' | 'appointment' | 'appointment_tracking' | 'supabase_orders' | 'central_system';
 
 export interface Product {
   id: string;
@@ -61,8 +61,17 @@ export interface StreamEventLog {
 
 export type OrderStreamCallback = (data: SupabaseOrderRecord, event?: StreamEventLog) => void;
 
+export type PaymentMethodCategory = 
+  | 'upi' 
+  | 'card' 
+  | 'netbanking' 
+  | 'wallet' 
+  | 'fleet_card' 
+  | 'pay_later' 
+  | 'pod';
+
 export interface PaymentTransactionInfo {
-  method: 'upi' | 'card' | 'netbanking' | 'wallet' | 'pod';
+  method: PaymentMethodCategory;
   methodTitle: string;
   transactionId: string;
   rrn: string; // Retrieval Reference Number (Bank RRN)
@@ -74,11 +83,20 @@ export interface PaymentTransactionInfo {
   deliveryFee: number;
   gstAmount: number;
   invoiceNumber: string;
+  // Option-specific metadata
   cardLast4?: string;
   cardBrand?: string;
   upiVpa?: string;
+  upiApp?: string;
   bankName?: string;
   walletName?: string;
+  fleetProvider?: string;
+  fleetCardNumber?: string;
+  fleetVehicleReg?: string;
+  fleetOdometer?: string;
+  payLaterProvider?: string;
+  podType?: 'cash' | 'card_pos' | 'qr_pos';
+  changeRequiredFor?: number;
 }
 
 export interface Order {
@@ -106,5 +124,15 @@ export interface Order {
   last_updated_at?: string;
   payment?: PaymentTransactionInfo;
 }
+
+export interface CompanionSyncEvent {
+  sourceAppId: string;
+  targetAppId: string;
+  type: 'ORDER_PLACED' | 'ORDER_ACCEPTED' | 'LOCATION_UPDATE' | 'STATUS_CHANGE' | 'OTP_VERIFIED' | 'PING' | 'PONG';
+  orderId?: string;
+  data?: any;
+  timestamp: number;
+}
+
 
 

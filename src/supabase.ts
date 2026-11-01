@@ -2,7 +2,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Fallback project configuration
 export const SUPABASE_PROJECT_REF = 'arierwpjaksxxnmvbqwn';
-export const DEFAULT_FALLBACK_URL = 'https://your-project-id.supabase.co';
+export const DEFAULT_FALLBACK_URL = 'https://arierwpjaksxxnmvbqwn.supabase.co';
 export const DEFAULT_FALLBACK_KEY = 'ap-southeast-1';
 
 /**
@@ -81,6 +81,7 @@ export const supabase: SupabaseClient = createSafeSupabaseClient(supabaseUrl, su
 
 export const SUPABASE_URL = supabaseUrl;
 export const SUPABASE_ANON_KEY = supabaseAnonKey;
+export { supabaseUrl, supabaseAnonKey };
 
 /**
  * Resolves the effective Supabase config using stored localStorage or environment fallback strings

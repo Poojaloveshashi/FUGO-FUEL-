@@ -17,10 +17,13 @@ import {
   Zap,
   AlertTriangle,
   ShieldAlert,
-  ArrowRight
+  ArrowRight,
+  Radio
 } from 'lucide-react';
 import { Screen, UserLocation } from '../../types';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import CompanionSyncModal from '../Companion/CompanionSyncModal';
+import { companionSync } from '../../services/companionSync';
 
 interface HomeProps {
   onNavigate: (screen: Screen) => void;
@@ -43,6 +46,15 @@ export default function Home({
   onOrderFuel 
 }: HomeProps) {
   const [showLocations, setShowLocations] = useState(false);
+  const [showCompanionModal, setShowCompanionModal] = useState(false);
+  const [isCompanionConnected, setIsCompanionConnected] = useState(companionSync.isConnected());
+
+  useEffect(() => {
+    const unsub = companionSync.subscribe(() => {
+      setIsCompanionConnected(companionSync.isConnected());
+    });
+    return unsub;
+  }, []);
 
   const categories = [
     { id: 'fuel', icon: Fuel, label: 'Fuel Up', color: 'bg-orange-500', desc: 'Petrol/Diesel' },
@@ -60,7 +72,16 @@ export default function Home({
           </div>
           <span className="font-bold text-lg tracking-tight">Fugo Fuel</span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowCompanionModal(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-xs font-bold transition-all"
+            title="Companion Bowser Partner App Sync"
+          >
+            <Radio className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
+            <span className="hidden sm:inline">Driver App</span>
+            <span className={`w-1.5 h-1.5 rounded-full ${isCompanionConnected ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+          </button>
           <button 
             onClick={() => onNavigate('notifications')}
             className="relative active:scale-95 transition-transform"
@@ -242,6 +263,80 @@ export default function Home({
           </motion.button>
         </section>
 
+        {/* Central System Architecture Interactive Card (Matches User's Ecosystem Diagram) */}
+        <section
+          onClick={() => onNavigate('central_system')}
+          className="bg-[#12161c] text-white p-5 rounded-[2.5rem] border border-slate-800 shadow-xl cursor-pointer hover:border-indigo-500/60 transition-all group relative overflow-hidden"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              <span className="text-[10px] font-black uppercase tracking-wider text-indigo-300 font-mono">
+                Ecosystem Architecture
+              </span>
+            </div>
+            <div className="flex items-center gap-1 text-[11px] font-bold text-indigo-400 group-hover:text-indigo-300 transition-colors">
+              <span>Inspect Live System</span>
+              <ArrowRightIcon className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+
+          {/* Interactive visual diagram widget */}
+          <div className="bg-[#181e26] p-4 rounded-3xl border border-slate-800/80 space-y-2.5">
+            {/* Top: 3 Apps */}
+            <div className="grid grid-cols-3 gap-2 text-center text-[10px] font-bold">
+              <div className="bg-[#0f4333] text-emerald-300 py-1.5 px-1 rounded-xl border border-emerald-700/50 truncate">
+                Fuel app
+              </div>
+              <div className="bg-[#0f4333] text-emerald-300 py-1.5 px-1 rounded-xl border border-emerald-700/50 truncate">
+                Repairs app
+              </div>
+              <div className="bg-[#0f4333] text-emerald-300 py-1.5 px-1 rounded-xl border border-emerald-700/50 truncate">
+                Service app
+              </div>
+            </div>
+
+            {/* Connecting Arrows */}
+            <div className="flex justify-around text-slate-500 text-[11px] leading-none py-0.5">
+              <span>↕</span>
+              <span>↕</span>
+              <span>↕</span>
+            </div>
+
+            {/* Middle: Central system */}
+            <div className="bg-[#3d3282] text-white py-2 px-3 rounded-2xl text-center border border-indigo-400/40 shadow-sm">
+              <span className="text-xs font-black block">Central system</span>
+              <span className="text-[10px] text-indigo-200 block">Same users, orders, payments, stock</span>
+            </div>
+
+            {/* Connecting Arrow */}
+            <div className="text-center text-slate-500 text-[11px] leading-none py-0.5">
+              <span>↕</span>
+            </div>
+
+            {/* Bottom: Fulfilment */}
+            <div className="border border-dashed border-slate-700/90 rounded-2xl p-2 bg-black/20">
+              <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400 block mb-1">
+                Fulfilment
+              </span>
+              <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+                <div className="bg-slate-800/80 py-1 px-2 rounded-lg text-slate-200">
+                  <strong>Delivery</strong>: Fuel drop-offs
+                </div>
+                <div className="bg-slate-800/80 py-1 px-2 rounded-lg text-slate-200">
+                  <strong>Mechanics</strong>: Repairs + service
+                </div>
+                <div className="bg-slate-800/80 py-1 px-2 rounded-lg text-slate-200">
+                  <strong>Offline outlets</strong>: Pumps, garages
+                </div>
+                <div className="bg-slate-800/80 py-1 px-2 rounded-lg text-slate-200">
+                  <strong>Warehouse</strong>: Fuel + parts stock
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Dashboard Widgets */}
         <div className="grid grid-cols-1 gap-4">
           <section 
@@ -384,6 +479,12 @@ export default function Home({
         <NavButton icon={ShoppingBag} onClick={() => onNavigate('checkout')} badge={cartCount > 0 ? cartCount : undefined} />
         <NavButton icon={User} onClick={() => onNavigate('settings')} />
       </nav>
+
+      {/* Companion Driver App Sync Bridge Modal */}
+      <CompanionSyncModal
+        isOpen={showCompanionModal}
+        onClose={() => setShowCompanionModal(false)}
+      />
     </div>
   );
 }

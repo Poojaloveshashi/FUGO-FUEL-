@@ -7,8 +7,9 @@ import {
   normalizeSupabaseUrl, 
   getEffectiveSupabaseConfig 
 } from '../supabase';
+import { companionSync } from './companionSync';
 
-export { SUPABASE_URL, SUPABASE_ANON_KEY, normalizeSupabaseUrl };
+export { SUPABASE_URL, SUPABASE_ANON_KEY, normalizeSupabaseUrl, companionSync };
 
 const STORAGE_KEY_ORDERS = 'fugo_supabase_orders';
 const STORAGE_KEY_CONFIG = 'fugo_supabase_config';
@@ -219,6 +220,7 @@ export async function placeSupabaseOrder(
 
   // Always save locally for instant offline tracking and fast UI updates
   saveLocalOrder(record);
+  companionSync.notifyOrderPlaced(record);
   broadcastLocalOrderUpdate(record, {
     id: `ev_${Date.now()}`,
     timestamp: new Date().toLocaleTimeString(),
@@ -290,6 +292,7 @@ export async function placeSupabaseOrder(
     };
 
     saveLocalOrder(cloudRecord);
+    companionSync.notifyOrderPlaced(cloudRecord);
     broadcastLocalOrderUpdate(cloudRecord);
     return {
       success: true,
@@ -367,13 +370,21 @@ export async function updateOrderStatus(orderId: string, newStatus: 'PENDING' | 
   }
 
   if (updatedRecord) {
+    companionSync.broadcast({
+      type: 'STATUS_CHANGE',
+      orderId,
+      status: newStatus,
+      driver_lat: (updatedRecord as SupabaseOrderRecord).driver_lat,
+      driver_lng: (updatedRecord as SupabaseOrderRecord).driver_lng,
+      message: `Order ${orderId} status updated to ${newStatus}`,
+    });
     broadcastLocalOrderUpdate(updatedRecord, {
       id: `ev_${Date.now()}`,
       timestamp: new Date().toLocaleTimeString(),
       type: 'STATUS_CHANGE',
       status: newStatus,
-      driver_lat: updatedRecord.driver_lat,
-      driver_lng: updatedRecord.driver_lng,
+      driver_lat: (updatedRecord as SupabaseOrderRecord).driver_lat,
+      driver_lng: (updatedRecord as SupabaseOrderRecord).driver_lng,
       message: `Order ${orderId} status changed to ${newStatus}`,
       raw: updatedRecord,
     });
@@ -424,6 +435,15 @@ export async function updateDriverLocation(
   }
 
   if (updatedRecord) {
+    companionSync.broadcast({
+      type: 'DRIVER_LOCATION_UPDATE',
+      orderId,
+      driver_lat: lat,
+      driver_lng: lng,
+      speed_kmh: speedKmh,
+      status: (updatedRecord as SupabaseOrderRecord).status,
+      message: `Driver Location: ${lat.toFixed(4)}, ${lng.toFixed(4)} (${Math.round(speedKmh)} km/h)`,
+    });
     broadcastLocalOrderUpdate(updatedRecord, {
       id: `ev_${Date.now()}`,
       timestamp: new Date().toLocaleTimeString(),
@@ -431,7 +451,7 @@ export async function updateDriverLocation(
       driver_lat: lat,
       driver_lng: lng,
       speed_kmh: speedKmh,
-      status: updatedRecord.status,
+      status: (updatedRecord as SupabaseOrderRecord).status,
       message: `Driver Location: ${lat.toFixed(4)}, ${lng.toFixed(4)} (${Math.round(speedKmh)} km/h)`,
       raw: updatedRecord,
     });
@@ -513,6 +533,46 @@ export function subscribeToOrderStream(
   if (typeof window !== 'undefined') {
     window.addEventListener(EVENT_STREAM_UPDATE, handleLocalEvent);
   }
+
+  // 3. Listen to Companion App (4d28260b-2153-449e-8927-36441be4e78c) Live Sync
+  const unsubscribeCompanion = companionSync.subscribe((msg) => {
+    if (!isSubscribed) return;
+    if (msg.orderId === orderId || msg.order?.id === orderId) {
+      const existing = getLocalOrderById(orderId);
+      if (existing) {
+        let hasChanges = false;
+        const updated = { ...existing };
+        if (msg.status && msg.status !== updated.status) {
+          updated.status = msg.status as any;
+          hasChanges = true;
+        }
+        if (msg.driver_lat !== undefined && msg.driver_lng !== undefined) {
+          updated.driver_lat = msg.driver_lat;
+          updated.driver_lng = msg.driver_lng;
+          hasChanges = true;
+        }
+        if (msg.speed_kmh !== undefined) {
+          updated.driver_speed_kmh = msg.speed_kmh;
+          hasChanges = true;
+        }
+
+        if (hasChanges) {
+          saveLocalOrder(updated);
+          onData(updated, {
+            id: `ev_comp_${Date.now()}`,
+            timestamp: new Date().toLocaleTimeString(),
+            type: msg.type === 'STATUS_CHANGE' ? 'STATUS_CHANGE' : 'LOCATION_UPDATE',
+            status: updated.status,
+            driver_lat: updated.driver_lat,
+            driver_lng: updated.driver_lng,
+            speed_kmh: updated.driver_speed_kmh,
+            message: `Companion App (4d28260b): ${msg.message || msg.type}`,
+            raw: msg,
+          });
+        }
+      }
+    }
+  });
 
   // 3. Supabase Cloud Realtime Channel (if client is configured)
   const client = getSupabaseClient();
@@ -603,6 +663,7 @@ export function subscribeToOrderStream(
   // Return unsubscribe cleanup function
   return () => {
     isSubscribed = false;
+    unsubscribeCompanion();
     if (simTimer) clearInterval(simTimer);
     if (typeof window !== 'undefined') {
       window.removeEventListener(EVENT_STREAM_UPDATE, handleLocalEvent);

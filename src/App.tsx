@@ -27,6 +27,7 @@ import AppointmentBooking from './components/Screens/AppointmentBooking';
 import RepairTracking from './components/Screens/RepairTracking';
 
 import SupabaseOrders from './components/Screens/SupabaseOrders';
+import CentralSystem from './components/Screens/CentralSystem';
 import SOSModal from './components/Screens/SOSModal';
 import { placeSupabaseOrder, generateDeliveryOtp, updateOrderStatus } from './services/supabase';
 
@@ -377,6 +378,15 @@ export default function App() {
               setActiveOrder(convertedOrder);
               setCurrentScreen('tracking');
             }}
+          />
+        );
+      case 'central_system':
+        return (
+          <CentralSystem
+            onBack={() => setCurrentScreen('home')}
+            onNavigate={setCurrentScreen}
+            selectedLocation={selectedLocation}
+            userPhone={user?.phone || '+91 98765 43210'}
           />
         );
       default:

@@ -22,7 +22,8 @@ import {
   CheckCircle2,
   Share2,
   Receipt,
-  CreditCard
+  CreditCard,
+  ExternalLink
 } from 'lucide-react';
 import { Order, StreamEventLog, SupabaseOrderRecord } from '../../types';
 import { 
@@ -30,7 +31,9 @@ import {
   updateOrderStatus, 
   updateDriverLocation 
 } from '../../services/supabase';
+import { companionSync, COMPANION_APP_URL, COMPANION_APP_ID } from '../../services/companionSync';
 import PaymentReceiptModal from '../Payment/PaymentReceiptModal';
+import CompanionSyncModal from '../Companion/CompanionSyncModal';
 
 interface TrackingProps {
   order: Order | null;
@@ -67,6 +70,15 @@ export default function Tracking({ order, onBack }: TrackingProps) {
   const [simSpeed, setSimSpeed] = useState<number>(1);
   const [isSimPaused, setIsSimPaused] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [isCompanionModalOpen, setIsCompanionModalOpen] = useState(false);
+  const [isCompanionConnected, setIsCompanionConnected] = useState(companionSync.isConnected());
+
+  useEffect(() => {
+    const unsub = companionSync.subscribe(() => {
+      setIsCompanionConnected(companionSync.isConnected());
+    });
+    return unsub;
+  }, []);
 
   // Subscribe to real-time Supabase stream matching user's Flutter/Dart pattern:
   // Supabase.instance.client.from('orders').stream(primaryKey: ['id']).eq('id', activeOrderId).listen(...)
@@ -210,6 +222,15 @@ export default function Tracking({ order, onBack }: TrackingProps) {
               className="bg-black/60 backdrop-blur-md p-1.5 rounded-xl border border-white/10 text-white hover:bg-black/80"
             >
               {isSimPaused ? <Play className="w-3.5 h-3.5 text-emerald-400" /> : <Pause className="w-3.5 h-3.5 text-amber-400" />}
+            </button>
+            <button
+              onClick={() => setIsCompanionModalOpen(true)}
+              title="Open Companion Driver App (4d28260b) Bridge"
+              className="bg-indigo-600/80 backdrop-blur-md px-2.5 py-1 rounded-xl border border-indigo-400/40 text-[10px] font-bold text-white hover:bg-indigo-600 flex items-center gap-1.5 shadow-sm"
+            >
+              <Radio className="w-3 h-3 text-indigo-200 animate-pulse" />
+              <span>Driver App</span>
+              <span className={`w-1.5 h-1.5 rounded-full ${isCompanionConnected ? 'bg-emerald-400' : 'bg-amber-400'}`} />
             </button>
           </div>
         </div>
@@ -611,6 +632,13 @@ export default function Tracking({ order, onBack }: TrackingProps) {
             onProceedToTracking={() => setShowInvoiceModal(false)}
           />
         )}
+
+        {/* Companion Driver App Sync Bridge Modal */}
+        <CompanionSyncModal
+          isOpen={isCompanionModalOpen}
+          activeOrderId={order.id}
+          onClose={() => setIsCompanionModalOpen(false)}
+        />
       </div>
     </div>
   );

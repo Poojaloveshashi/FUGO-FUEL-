@@ -117,6 +117,27 @@ export default function PaymentReceiptModal({
                 </span>
               </div>
 
+              {payment.fleetVehicleReg && (
+                <div className="flex justify-between items-center bg-blue-50/60 p-2 rounded-xl border border-blue-100">
+                  <span className="text-blue-700 font-medium">Fleet Vehicle Reg</span>
+                  <span className="font-mono font-extrabold text-blue-950">{payment.fleetVehicleReg}</span>
+                </div>
+              )}
+
+              {payment.fleetOdometer && (
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400 font-medium">Odometer Reading</span>
+                  <span className="font-mono text-slate-700">{payment.fleetOdometer} km</span>
+                </div>
+              )}
+
+              {payment.upiVpa && (
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400 font-medium">UPI VPA</span>
+                  <span className="font-mono text-slate-700">{payment.upiVpa}</span>
+                </div>
+              )}
+
               <div className="flex justify-between items-center">
                 <span className="text-slate-400 font-medium">Date & Time</span>
                 <span className="text-slate-700 font-mono text-[11px]">{payment.paidAt}</span>
