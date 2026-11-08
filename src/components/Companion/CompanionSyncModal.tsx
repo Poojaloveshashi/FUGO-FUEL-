@@ -24,7 +24,7 @@ import {
   COMPANION_APP_ID, 
   CURRENT_APP_ID 
 } from '../../services/companionSync';
-import { updateOrderStatus, updateDriverLocation, getLocalOrders } from '../../services/supabase';
+import { getLocalOrders } from '../../services/supabase';
 import { SupabaseOrderRecord } from '../../types';
 
 interface CompanionSyncModalProps {
@@ -109,46 +109,7 @@ export default function CompanionSyncModal({
     setTimeout(() => setCopiedUrl(false), 2000);
   };
 
-  // Simulation controls to test bidirectional sync
-  const handleDriverAccept = () => {
-    if (!activeOrder) return;
-    updateOrderStatus(activeOrder.id, 'DISPATCHED');
-    companionSync.broadcast({
-      type: 'ORDER_ACCEPTED',
-      orderId: activeOrder.id,
-      status: 'DISPATCHED',
-      message: `Driver partner accepted order #${activeOrder.id}`,
-    });
-  };
 
-  const handleDriverMove = () => {
-    if (!activeOrder) return;
-    const destLat = activeOrder.delivery_lat || 17.4125;
-    const destLng = activeOrder.delivery_lng || 78.3364;
-    // Step closer
-    const nextLat = Number(((activeOrder.driver_lat || destLat + 0.01) - 0.003).toFixed(6));
-    const nextLng = Number(((activeOrder.driver_lng || destLng + 0.01) - 0.002).toFixed(6));
-    updateDriverLocation(activeOrder.id, nextLat, nextLng, 44);
-    companionSync.broadcast({
-      type: 'DRIVER_LOCATION_UPDATE',
-      orderId: activeOrder.id,
-      driver_lat: nextLat,
-      driver_lng: nextLng,
-      speed_kmh: 44,
-      message: `Bowser in transit to destination (${nextLat}, ${nextLng})`,
-    });
-  };
-
-  const handleDriverDeliver = () => {
-    if (!activeOrder) return;
-    updateOrderStatus(activeOrder.id, 'DELIVERED');
-    companionSync.broadcast({
-      type: 'DELIVERY_COMPLETED',
-      orderId: activeOrder.id,
-      status: 'DELIVERED',
-      message: `Fuel dispensed successfully. OTP verified: ${activeOrder.otp}`,
-    });
-  };
 
   return (
     <AnimatePresence>
@@ -275,50 +236,23 @@ export default function CompanionSyncModal({
               </button>
             </div>
 
-            {/* Remote Bowser Driver Simulator Controls */}
+            {/* Companion App Info */}
             {activeOrder && (
-              <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50 space-y-3">
+              <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <Truck className="w-4 h-4 text-orange-500" />
                     <span className="text-xs font-bold text-slate-800">
-                      Active Order Simulator: {activeOrder.id}
+                      Active Order ID: {activeOrder.id}
                     </span>
                   </div>
                   <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-800">
-                    OTP: {activeOrder.otp}
+                    Live Status: {activeOrder.status}
                   </span>
                 </div>
-
                 <p className="text-[11px] text-slate-500">
-                  You can trigger driver partner responses directly here to test live updates, or perform them in the companion tab!
+                  Open the driver app in another tab or device. The driver will claim this order and stream GPS coordinates directly to your map.
                 </p>
-
-                <div className="grid grid-cols-3 gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={handleDriverAccept}
-                    className="p-2 bg-white hover:bg-slate-100 active:scale-95 border border-slate-300 rounded-xl text-[10px] font-bold text-slate-800 text-center shadow-sm transition-all"
-                  >
-                    1. Accept & Dispatch
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleDriverMove}
-                    className="p-2 bg-white hover:bg-slate-100 active:scale-95 border border-slate-300 rounded-xl text-[10px] font-bold text-slate-800 text-center shadow-sm transition-all"
-                  >
-                    2. Drive Closer
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleDriverDeliver}
-                    className="p-2 bg-white hover:bg-slate-100 active:scale-95 border border-slate-300 rounded-xl text-[10px] font-bold text-emerald-800 text-center shadow-sm transition-all"
-                  >
-                    3. Verify OTP & Finish
-                  </button>
-                </div>
               </div>
             )}
 

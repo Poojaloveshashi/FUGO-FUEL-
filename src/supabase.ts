@@ -1,119 +1,129 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Fallback project configuration
+// Default Supabase project configuration (using valid client-side publishable key)
+export const DEFAULT_SUPABASE_URL = 'https://arierwpjaksxxnmvbqwn.supabase.co';
+export const DEFAULT_SUPABASE_KEY = 'sb_publishable__c-Q3k0ibuQMt3_mtYpRNw_Se-8kFbS';
+
 export const SUPABASE_PROJECT_REF = 'arierwpjaksxxnmvbqwn';
-export const DEFAULT_FALLBACK_URL = 'https://arierwpjaksxxnmvbqwn.supabase.co';
-export const DEFAULT_FALLBACK_KEY = 'ap-southeast-1';
+export const DEFAULT_FALLBACK_URL = DEFAULT_SUPABASE_URL;
+export const DEFAULT_FALLBACK_KEY = DEFAULT_SUPABASE_KEY;
+
+export const HARDCODED_SUPABASE_URL = DEFAULT_SUPABASE_URL;
+export const HARDCODED_SUPABASE_KEY = DEFAULT_SUPABASE_KEY;
 
 /**
- * Normalizes and validates any URL or project ID into a valid HTTP/HTTPS URL
+ * Validates that a Supabase URL starts with https:// and is not a placeholder
  */
-export function normalizeSupabaseUrl(input?: string): string {
-  if (!input || typeof input !== 'string') return DEFAULT_FALLBACK_URL;
-  const trimmed = input.trim();
+export function isValidSupabaseUrl(url?: string | null): boolean {
+  if (!url || typeof url !== 'string') return false;
+  const u = url.trim();
+  if (!u.startsWith('https://')) return false;
   if (
-    !trimmed || 
-    trimmed === 'YOUR_SUPABASE_URL' || 
-    trimmed === 'undefined' || 
-    trimmed === 'null' ||
-    trimmed === 'YOUR_SUPABASE_URL_HERE'
+    u.includes('YOUR_ACTUAL_PROJECT_REF') || 
+    u.includes('YOUR_SUPABASE_URL') || 
+    u.includes('your-project-id')
   ) {
-    return DEFAULT_FALLBACK_URL;
+    return false;
   }
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-    try {
-      const parsed = new URL(trimmed);
-      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-        return trimmed;
+  return true;
+}
+
+/**
+ * Validates that a Supabase key is a valid client-side key (sb_publishable_ or anon JWT eyJ...)
+ * Note: Secret keys (sb_secret_...) are strictly rejected by Supabase in browser environments.
+ */
+export function isValidSupabaseKey(key?: string | null): boolean {
+  if (!key || typeof key !== 'string') return false;
+  const k = key.trim();
+  if (
+    k === 'ap-southeast-1' || 
+    k === 'YOUR_ACTUAL_ANON_KEY' || 
+    k === 'YOUR_SUPABASE_ANON_KEY' ||
+    k.startsWith('sb_secret_') ||
+    k === 'undefined' ||
+    k === 'null'
+  ) {
+    return false;
+  }
+  return k.startsWith('sb_publishable_') || k.startsWith('eyJ');
+}
+
+// Clean stored config if it contains invalid values, legacy keys, or forbidden sb_secret_ keys
+if (typeof localStorage !== 'undefined') {
+  try {
+    const raw = localStorage.getItem('fugo_supabase_config');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (
+        !isValidSupabaseUrl(parsed.url) || 
+        !isValidSupabaseKey(parsed.key) || 
+        parsed.key?.startsWith('sb_secret_') ||
+        parsed.key === 'sb_publishable_7Eo4cNMUzMwFMmHd5ZiQlA_pyygJ0uM'
+      ) {
+        localStorage.removeItem('fugo_supabase_config');
       }
-    } catch {
-      return DEFAULT_FALLBACK_URL;
     }
+  } catch {
+    // ignore
   }
-  if (/^[a-z0-9_-]+$/i.test(trimmed)) {
-    return `https://${trimmed}.supabase.co`;
-  }
-  return DEFAULT_FALLBACK_URL;
 }
 
-/**
- * Normalizes and validates anon key
- */
-export function normalizeSupabaseKey(input?: string): string {
-  if (!input || typeof input !== 'string') return DEFAULT_FALLBACK_KEY;
-  const trimmed = input.trim();
-  if (
-    !trimmed || 
-    trimmed === 'YOUR_SUPABASE_ANON_KEY' || 
-    trimmed === 'undefined' || 
-    trimmed === 'null'
-  ) {
-    return DEFAULT_FALLBACK_KEY;
-  }
-  return trimmed;
-}
-
-// Safely determine initial URL and Key from environment or defaults
 const envUrl = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_SUPABASE_URL;
 const envKey = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_SUPABASE_ANON_KEY;
 
-const supabaseUrl = normalizeSupabaseUrl(envUrl);
-const supabaseAnonKey = normalizeSupabaseKey(envKey);
+let storedConfigUrl: string | undefined;
+let storedConfigKey: string | undefined;
 
-/**
- * Create Supabase client safely with catch fallback to ensure the app never crashes
- */
-function createSafeSupabaseClient(url: string, key: string): SupabaseClient {
+if (typeof localStorage !== 'undefined') {
   try {
-    return createClient(url, key);
-  } catch (err) {
-    console.warn('[Supabase] Warning: initial client initialization with configured URL failed, falling back to safe URL:', err);
-    try {
-      return createClient(DEFAULT_FALLBACK_URL, DEFAULT_FALLBACK_KEY);
-    } catch (fallbackErr) {
-      console.error('[Supabase] Critical error initializing fallback client:', fallbackErr);
-      return createClient('https://your-project-id.supabase.co', 'ap-southeast-1');
+    const raw = localStorage.getItem('fugo_supabase_config');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (isValidSupabaseUrl(parsed.url) && isValidSupabaseKey(parsed.key)) {
+        storedConfigUrl = parsed.url;
+        storedConfigKey = parsed.key;
+      }
     }
+  } catch {
+    // ignore
   }
 }
 
-export const supabase: SupabaseClient = createSafeSupabaseClient(supabaseUrl, supabaseAnonKey);
+// Priority: Valid stored config -> Valid env var -> Project default publishable key
+export const supabaseUrl = (storedConfigUrl && isValidSupabaseUrl(storedConfigUrl))
+  ? storedConfigUrl
+  : (envUrl && isValidSupabaseUrl(envUrl))
+  ? envUrl
+  : DEFAULT_SUPABASE_URL;
+
+export const supabaseAnonKey = (storedConfigKey && isValidSupabaseKey(storedConfigKey))
+  ? storedConfigKey
+  : (envKey && isValidSupabaseKey(envKey))
+  ? envKey
+  : DEFAULT_SUPABASE_KEY;
+
+export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey);
 
 export const SUPABASE_URL = supabaseUrl;
 export const SUPABASE_ANON_KEY = supabaseAnonKey;
-export { supabaseUrl, supabaseAnonKey };
 
-/**
- * Resolves the effective Supabase config using stored localStorage or environment fallback strings
- */
+export function normalizeSupabaseUrl(input?: string): string {
+  if (!input || typeof input !== 'string') return DEFAULT_SUPABASE_URL;
+  const trimmed = input.trim();
+  if (trimmed.startsWith('https://')) return trimmed;
+  if (/^[a-z0-9_-]+$/i.test(trimmed)) return `https://${trimmed}.supabase.co`;
+  return DEFAULT_SUPABASE_URL;
+}
+
+export function isSupabaseConfigured(): boolean {
+  return isValidSupabaseUrl(supabaseUrl) && isValidSupabaseKey(supabaseAnonKey);
+}
+
 export function getEffectiveSupabaseConfig(): { url: string; key: string } {
-  let storedUrl = '';
-  let storedKey = '';
-
-  try {
-    if (typeof localStorage !== 'undefined') {
-      const stored = localStorage.getItem('fugo_supabase_config');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        storedUrl = parsed.url || '';
-        storedKey = parsed.key || '';
-      }
-    }
-  } catch (e) {
-    // Graceful fallback
-  }
-
-  const rawUrl = storedUrl || envUrl;
-  const finalUrl = normalizeSupabaseUrl(rawUrl);
-
-  const rawKey = storedKey || envKey;
-  const finalKey = normalizeSupabaseKey(rawKey);
-
   return {
-    url: finalUrl,
-    key: finalKey,
+    url: supabaseUrl,
+    key: supabaseAnonKey,
   };
 }
 
 export default supabase;
-

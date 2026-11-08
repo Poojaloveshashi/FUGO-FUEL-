@@ -2,18 +2,58 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { SupabaseOrderPayload, SupabaseOrderRecord, OrderStreamCallback, StreamEventLog } from '../types';
 import { 
   supabase as defaultSupabaseClient, 
+  supabaseUrl,
+  supabaseAnonKey,
   SUPABASE_URL, 
   SUPABASE_ANON_KEY, 
+  DEFAULT_SUPABASE_URL,
+  DEFAULT_SUPABASE_KEY,
   normalizeSupabaseUrl, 
-  getEffectiveSupabaseConfig 
+  getEffectiveSupabaseConfig,
+  isSupabaseConfigured,
+  isValidSupabaseUrl,
+  isValidSupabaseKey
 } from '../supabase';
 import { companionSync } from './companionSync';
 
-export { SUPABASE_URL, SUPABASE_ANON_KEY, normalizeSupabaseUrl, companionSync };
+export { 
+  supabaseUrl, 
+  supabaseAnonKey, 
+  SUPABASE_URL, 
+  SUPABASE_ANON_KEY, 
+  DEFAULT_SUPABASE_URL, 
+  DEFAULT_SUPABASE_KEY, 
+  normalizeSupabaseUrl, 
+  companionSync, 
+  isSupabaseConfigured 
+};
 
 const STORAGE_KEY_ORDERS = 'fugo_supabase_orders';
 const STORAGE_KEY_CONFIG = 'fugo_supabase_config';
 const EVENT_STREAM_UPDATE = 'fugo:supabase-order-stream';
+
+/**
+ * Returns customer_id = 'cust_' + the last 10 digits of the phone.
+ * If phone is not provided, uses persistent anonymous device identifier so nobody shares an ID.
+ */
+export function getCustomerIdFromPhone(phone?: string | null): string {
+  if (!phone) {
+    let anonId = '';
+    try {
+      anonId = localStorage.getItem('fugo_anon_cust_id') || '';
+      if (!anonId) {
+        anonId = Math.floor(1000000000 + Math.random() * 9000000000).toString();
+        localStorage.setItem('fugo_anon_cust_id', anonId);
+      }
+    } catch {
+      anonId = Date.now().toString().slice(-10);
+    }
+    return `cust_${anonId}`;
+  }
+  const digits = phone.replace(/\D/g, '');
+  const last10 = digits.slice(-10);
+  return `cust_${last10.padStart(10, '0')}`;
+}
 
 export function getStoredSupabaseConfig() {
   const effective = getEffectiveSupabaseConfig();
@@ -21,10 +61,14 @@ export function getStoredSupabaseConfig() {
     const stored = localStorage.getItem(STORAGE_KEY_CONFIG);
     if (stored) {
       const parsed = JSON.parse(stored);
-      return {
-        url: normalizeSupabaseUrl(parsed.url || effective.url),
-        key: parsed.key || effective.key,
-      };
+      if (isValidSupabaseUrl(parsed.url) && isValidSupabaseKey(parsed.key)) {
+        return {
+          url: parsed.url,
+          key: parsed.key,
+        };
+      } else {
+        localStorage.removeItem(STORAGE_KEY_CONFIG);
+      }
     }
   } catch (e) {
     console.warn('Could not read stored Supabase config', e);
@@ -36,24 +80,15 @@ export function getStoredSupabaseConfig() {
 }
 
 export function saveStoredSupabaseConfig(url: string, key: string) {
-  const normalized = normalizeSupabaseUrl(url.trim());
-  localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify({ url: normalized, key: key.trim() }));
+  if (isValidSupabaseUrl(url) && isValidSupabaseKey(key)) {
+    localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify({ url: url.trim(), key: key.trim() }));
+  }
 }
 
 let clientInstance: SupabaseClient | null = null;
 
 export function getSupabaseClient(): SupabaseClient {
-  const config = getStoredSupabaseConfig();
-  if (clientInstance) {
-    return clientInstance;
-  }
-  try {
-    clientInstance = createClient(config.url, config.key);
-    return clientInstance;
-  } catch (e) {
-    console.warn('Failed to create customized Supabase client, using default:', e);
-    return defaultSupabaseClient;
-  }
+  return defaultSupabaseClient;
 }
 
 export function resetSupabaseClient() {
@@ -61,72 +96,111 @@ export function resetSupabaseClient() {
 }
 
 /**
- * Generate a 4-digit delivery security OTP (e.g., '4821')
+ * Generate a random 4-digit code (e.g. 1000-9999) for handshake OTP
  */
 export function generateDeliveryOtp(): string {
   return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
 /**
- * Order Fuel helper: Inserts an order with status 'PENDING' and 4-digit OTP
+ * Order Fuel helper: Inserts a record into the 'orders' table with status 'PENDING'.
+ * Sends service_type 'FUEL', address, price, and customer_phone.
+ * Stops sending driver_lat, driver_lng, driver_speed_kmh.
  */
 export async function orderFuel({
-  fuelType = 'Diesel (BS-VI)',
+  fuelType = 'Clean Diesel (BS-VI)',
   litres = 20,
-  customerId = 'cust_123',
+  customerId,
+  customerPhone,
   deliveryLat = 17.4125,
   deliveryLng = 78.3364,
+  address = 'DLF Cyber City, Gachibowli, Hyderabad',
+  totalAmount = 1980,
+  paymentStatus = 'UNPAID',
 }: {
   fuelType?: string;
   litres?: number;
   customerId?: string;
+  customerPhone?: string;
   deliveryLat?: number;
   deliveryLng?: number;
+  address?: string;
+  totalAmount?: number;
+  paymentStatus?: 'PAID' | 'UNPAID';
 }) {
   const otp = generateDeliveryOtp();
+  const effectiveCustomerId = customerId || getCustomerIdFromPhone(customerPhone);
   return placeSupabaseOrder({
-    customer_id: customerId,
+    service_type: 'FUEL',
+    customer_id: effectiveCustomerId,
+    customer_phone: customerPhone,
     fuel_type: fuelType,
     litres: litres,
     delivery_lat: deliveryLat,
     delivery_lng: deliveryLng,
+    customer_location: `${deliveryLat}, ${deliveryLng}`,
+    address: address,
+    total_amount: totalAmount,
+    price: totalAmount,
     status: 'PENDING',
+    handshake_otp: otp,
     otp: otp,
+    payment_status: paymentStatus,
   });
 }
 
 /**
- * Request SOS helper: Inserts an emergency breakdown/fuel order with status 'PENDING' and 4-digit OTP
+ * Request SOS / Service helper: Inserts an emergency breakdown/service order with status 'PENDING'.
+ * Sends service_type 'FUEL', address, price, and customer_phone.
+ * Stops sending driver_lat, driver_lng, driver_speed_kmh.
  */
 export async function requestSOS({
-  sosType = 'Emergency SOS Breakdown',
-  customerId = 'cust_sos_emergency',
+  sosType = 'Emergency Roadside SOS',
+  customerId,
+  customerPhone,
   deliveryLat = 17.4125,
   deliveryLng = 78.3364,
+  address = 'EMERGENCY SOS: DLF Cyber City, Gachibowli',
   litres = 10,
+  totalAmount = 450,
 }: {
   sosType?: string;
   customerId?: string;
+  customerPhone?: string;
   deliveryLat?: number;
   deliveryLng?: number;
+  address?: string;
   litres?: number;
+  totalAmount?: number;
 }) {
   const otp = generateDeliveryOtp();
+  const effectiveCustomerId = customerId || getCustomerIdFromPhone(customerPhone);
   return placeSupabaseOrder({
-    customer_id: customerId,
+    service_type: 'FUEL',
+    customer_id: effectiveCustomerId,
+    customer_phone: customerPhone,
     fuel_type: sosType,
     litres: litres,
     delivery_lat: deliveryLat,
     delivery_lng: deliveryLng,
+    customer_location: `${deliveryLat}, ${deliveryLng}`,
+    address: address,
+    total_amount: totalAmount,
+    price: totalAmount,
     status: 'PENDING',
+    handshake_otp: otp,
     otp: otp,
+    payment_status: 'UNPAID',
   });
 }
 
 /**
- * Get all stored orders from local storage or cloud
+ * Get all stored orders from local storage
  */
 export function getLocalOrders(): SupabaseOrderRecord[] {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return [];
+  }
   try {
     const raw = localStorage.getItem(STORAGE_KEY_ORDERS);
     if (raw) {
@@ -138,23 +212,7 @@ export function getLocalOrders(): SupabaseOrderRecord[] {
   } catch (e) {
     console.error('Failed to load local orders', e);
   }
-  const defaultSample: SupabaseOrderRecord = {
-    id: 'ord_fugo_live1',
-    created_at: new Date().toISOString(),
-    customer_id: 'cust_123',
-    fuel_type: 'Clean Diesel (BS-VI)',
-    litres: 50,
-    delivery_lat: 17.4125,
-    delivery_lng: 78.3364,
-    driver_lat: 17.4290,
-    driver_lng: 78.3506,
-    driver_speed_kmh: 42,
-    status: 'DISPATCHED',
-    otp: '4821',
-    source: 'supabase_cloud',
-    last_updated_at: new Date().toISOString(),
-  };
-  return [defaultSample];
+  return [];
 }
 
 export function getLocalOrderById(orderId: string): SupabaseOrderRecord | null {
@@ -163,6 +221,9 @@ export function getLocalOrderById(orderId: string): SupabaseOrderRecord | null {
 }
 
 function saveLocalOrder(record: SupabaseOrderRecord) {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return;
+  }
   try {
     const current = getLocalOrders();
     const updated = [record, ...current.filter(o => o.id !== record.id)];
@@ -178,131 +239,276 @@ function broadcastLocalOrderUpdate(order: SupabaseOrderRecord, event?: StreamEve
   }
 }
 
+function generateUuid(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+export interface AppSettings {
+  merchant_vpa: string;
+  merchant_name: string;
+  gstin: string;
+  transport_fee: number;
+}
+
+let cachedSettings: AppSettings | null = null;
+
 /**
- * Place Order to Supabase `orders` table matching:
- * await Supabase.instance.client.from('orders').insert({
- *   'customer_id': 'cust_123',
- *   'fuel_type': 'Diesel',
- *   'litres': 100,
- *   'delivery_lat': 17.4125,
- *   'delivery_lng': 78.3364,
- *   'status': 'PENDING',
- *   'otp': '4821',
- * });
+ * Reads business details from public.app_settings in Supabase.
+ * If merchant_vpa is empty, UPI at the door is hidden.
+ */
+export async function fetchAppSettings(forceRefresh = false): Promise<AppSettings> {
+  if (cachedSettings && !forceRefresh) return cachedSettings;
+
+  const defaults: AppSettings = {
+    merchant_vpa: '6300352955@ibl',
+    merchant_name: 'Fugo',
+    gstin: '',
+    transport_fee: 100,
+  };
+
+  const client = getSupabaseClient();
+  if (!client || !isSupabaseConfigured()) return defaults;
+
+  try {
+    const { data, error } = await client
+      .from('app_settings')
+      .select('key, value');
+
+    if (!error && data && Array.isArray(data)) {
+      const map: Record<string, string> = {};
+      data.forEach((row: { key: string; value: string }) => {
+        map[row.key] = row.value;
+      });
+
+      cachedSettings = {
+        merchant_vpa: (map['merchant_vpa'] || '').trim(),
+        merchant_name: (map['merchant_name'] || '').trim() || 'Fugo',
+        gstin: (map['gstin'] || '').trim(),
+        transport_fee: Number(map['transport_fee'] || 0),
+      };
+      return cachedSettings;
+    }
+  } catch (err) {
+    console.warn('Could not load app_settings from Supabase:', err);
+  }
+
+  return defaults;
+}
+
+/**
+ * Fetches the delivery OTP using the fugo_get_my_otp RPC function if local copy is missing.
+ */
+export async function fetchMyOtp(orderId: string, customerId: string): Promise<string | null> {
+  const local = getLocalOrderById(orderId);
+  if (local?.otp && local.otp !== 'null' && local.otp !== 'undefined') {
+    return local.otp;
+  }
+
+  const client = getSupabaseClient();
+  if (!client || !isSupabaseConfigured()) return null;
+
+  try {
+    const { data, error } = await client.rpc('fugo_get_my_otp', {
+      p_order_id: orderId,
+      p_customer_id: customerId,
+    });
+
+    if (!error && data) {
+      const code = String(data).trim();
+      if (code) {
+        if (local) {
+          saveLocalOrder({ ...local, otp: code, handshake_otp: code });
+        }
+        return code;
+      }
+    }
+  } catch (err) {
+    console.warn('fugo_get_my_otp RPC error:', err);
+  }
+  return null;
+}
+
+/**
+ * Inserts a record into the 'orders' table.
+ * Sends payment_method ("COD" or "UPI"), total_amount, delivery_fee, gst_amount.
+ * Never sends payment_status, paid_at or collected_by.
+ * Keeps otp in the local order so customer can view it on tracking screen.
  */
 export async function placeSupabaseOrder(
   payload: SupabaseOrderPayload
 ): Promise<{ success: boolean; data: SupabaseOrderRecord; error?: string; cloudSynced: boolean }> {
   const client = getSupabaseClient();
-  const id = `ord_${Math.random().toString(36).substring(2, 9)}`;
+  const id = payload.id || generateUuid();
   const createdAt = new Date().toISOString();
-
-  // Initial driver origin: offset slightly from delivery destination (~2.2 km away)
-  const initialDriverLat = payload.driver_lat ?? (payload.delivery_lat + 0.0165);
-  const initialDriverLng = payload.driver_lng ?? (payload.delivery_lng + 0.0142);
+  const handshakeOtp = payload.handshake_otp || payload.otp || generateDeliveryOtp();
+  const totalAmount = payload.total_amount ?? payload.price ?? 0;
+  const price = payload.price ?? payload.total_amount ?? 0;
+  const deliveryFee = payload.delivery_fee ?? 25;
+  const gstAmount = payload.gst_amount ?? Math.round(Number(totalAmount) * 0.18);
+  const paymentMethod = payload.payment_method === 'UPI' ? 'UPI' : 'COD';
 
   const record: SupabaseOrderRecord = {
     id,
     created_at: createdAt,
-    customer_id: payload.customer_id,
-    fuel_type: payload.fuel_type,
-    litres: payload.litres,
-    delivery_lat: payload.delivery_lat,
-    delivery_lng: payload.delivery_lng,
-    driver_lat: initialDriverLat,
-    driver_lng: initialDriverLng,
-    driver_speed_kmh: payload.driver_speed_kmh ?? 38,
-    status: payload.status,
-    otp: payload.otp,
-    source: client ? 'supabase_cloud' : 'local_storage',
+    service_type: payload.service_type || 'FUEL',
+    status: (payload.status as any) || 'PENDING',
+    handshake_otp: handshakeOtp,
+    otp: handshakeOtp,
+    payment_status: 'PENDING',
+    payment_method: paymentMethod,
+    customer_location: payload.customer_location || `${payload.delivery_lat ?? payload.lat ?? 17.4125}, ${payload.delivery_lng ?? payload.lng ?? 78.3364}`,
+    address: payload.address || 'DLF Cyber City, Gachibowli, Hyderabad',
+    total_amount: totalAmount,
+    price: price,
+    delivery_fee: deliveryFee,
+    gst_amount: gstAmount,
+    customer_id: payload.customer_id || getCustomerIdFromPhone(payload.customer_phone),
+    customer_name: payload.customer_name || 'Fugo Customer',
+    customer_phone: payload.customer_phone,
+    fuel_type: payload.fuel_type || 'Fuel',
+    litres: payload.litres ?? 0,
+    description: payload.description,
+    delivery_lat: payload.delivery_lat ?? payload.lat ?? 17.4125,
+    delivery_lng: payload.delivery_lng ?? payload.lng ?? 78.3364,
+    source: isSupabaseConfigured() && client ? 'supabase_cloud' : 'local_storage',
     last_updated_at: createdAt,
+    parent_order_id: payload.parent_order_id,
   };
 
-  // Always save locally for instant offline tracking and fast UI updates
-  saveLocalOrder(record);
-  companionSync.notifyOrderPlaced(record);
-  broadcastLocalOrderUpdate(record, {
-    id: `ev_${Date.now()}`,
-    timestamp: new Date().toLocaleTimeString(),
-    type: 'CONNECTED',
-    status: record.status,
-    driver_lat: record.driver_lat,
-    driver_lng: record.driver_lng,
-    speed_kmh: record.driver_speed_kmh,
-    message: `Order ${record.id} placed: ${record.fuel_type} ${record.litres}L`,
-    raw: record,
-  });
-
-  if (!client) {
-    console.info('Supabase client not configured with URL/Key; order saved to local storage.', record);
-    return {
-      success: true,
-      data: record,
-      cloudSynced: false,
-      error: 'Supabase URL/Key not configured. Saved to local database.',
-    };
-  }
-
   try {
-    // Exact schema specified by user with driver coordinates
-    const insertPayload: Record<string, any> = {
-      customer_id: payload.customer_id,
-      fuel_type: payload.fuel_type,
-      litres: payload.litres,
-      delivery_lat: payload.delivery_lat,
-      delivery_lng: payload.delivery_lng,
-      status: payload.status,
-      otp: payload.otp,
-    };
-    if (record.driver_lat !== undefined) insertPayload.driver_lat = record.driver_lat;
-    if (record.driver_lng !== undefined) insertPayload.driver_lng = record.driver_lng;
-    if (record.driver_speed_kmh !== undefined) insertPayload.driver_speed_kmh = record.driver_speed_kmh;
+    const repairService = [record.description, record.address].filter(Boolean).join(' | ') || 'Service Order';
 
-    const { data, error } = await client
-      .from('orders')
-      .insert(insertPayload)
-      .select()
-      .single();
+    // Must never send payment_status, paid_at or collected_by
+    const insertPayload: Record<string, any> = {
+      customer_id: record.customer_id,
+      customer_name: record.customer_name || 'Fugo Customer',
+      customer_phone: record.customer_phone || '',
+      service_type: record.service_type || 'FUEL',
+      fuel_type: record.fuel_type,
+      litres: Number(record.litres ?? 0),
+      amount: Number(record.litres ?? 0),
+      address: record.address,
+      description: record.description,
+      repair_service: repairService,
+      lat: Number(record.delivery_lat ?? 17.4125),
+      lng: Number(record.delivery_lng ?? 78.3364),
+      delivery_lat: Number(record.delivery_lat ?? 17.4125),
+      delivery_lng: Number(record.delivery_lng ?? 78.3364),
+      status: record.status || 'PENDING',
+      otp: String(handshakeOtp),
+      price: Number(price),
+      total_amount: Number(totalAmount),
+      payment_method: paymentMethod,
+      delivery_fee: Number(deliveryFee),
+      gst_amount: Number(gstAmount),
+    };
+
+    if (record.id) {
+      insertPayload.id = record.id;
+    }
+
+    // Ensure all payload values are valid JSON (strip undefined)
+    const cleanPayload: Record<string, any> = {};
+    for (const [key, value] of Object.entries(insertPayload)) {
+      if (value !== undefined) {
+        cleanPayload[key] = value;
+      }
+    }
+
+    const targetClient = client || defaultSupabaseClient;
+    let data: any = null;
+    let error: any = null;
+
+    // Retry loop handling schema cache differences (PGRST204 missing columns before migration, or 22P02 uuid format)
+    let attempts = 0;
+    while (attempts < 6) {
+      attempts++;
+      const res = await targetClient
+        .from('orders')
+        .insert(cleanPayload)
+        .select()
+        .single();
+      data = res.data;
+      error = res.error;
+
+      if (!error) {
+        break;
+      }
+
+      // If a column is missing in schema cache before migration is run, drop the missing column and retry
+      if (error.code === 'PGRST204') {
+        const match = error.message?.match(/Could not find the '([^']+)' column/);
+        if (match && match[1] && match[1] in cleanPayload) {
+          delete cleanPayload[match[1]];
+          continue;
+        }
+      }
+
+      // If ID format error (e.g. 22P02 invalid input syntax for type uuid when REQ-... is sent), retry with UUID
+      if (error.code === '22P02' || error.message?.includes('uuid')) {
+        const fallbackUuid = generateUuid();
+        if (cleanPayload.id !== fallbackUuid) {
+          cleanPayload.id = fallbackUuid;
+          continue;
+        }
+      }
+
+      // If unhandled or repeat error, break loop
+      break;
+    }
 
     if (error) {
-      console.warn('Supabase remote insert warning:', error.message);
+      console.error('Fetch error:', error, supabaseUrl);
       return {
-        success: true,
+        success: false,
         data: record,
         cloudSynced: false,
         error: error.message,
       };
     }
 
+    // The server trigger moves otp to order_otps table and zeroes it in public.orders.
+    // Keep the generated code in local order record so customer can view it on tracking screen.
     const cloudRecord: SupabaseOrderRecord = {
-      id: data?.id ? String(data.id) : record.id,
+      ...record,
+      id: String(data?.id || cleanPayload.id || record.id),
       created_at: data?.created_at || createdAt,
-      customer_id: data?.customer_id || payload.customer_id,
-      fuel_type: data?.fuel_type || payload.fuel_type,
-      litres: data?.litres ?? payload.litres,
-      delivery_lat: data?.delivery_lat ?? payload.delivery_lat,
-      delivery_lng: data?.delivery_lng ?? payload.delivery_lng,
-      driver_lat: data?.driver_lat ?? record.driver_lat,
-      driver_lng: data?.driver_lng ?? record.driver_lng,
-      driver_speed_kmh: data?.driver_speed_kmh ?? record.driver_speed_kmh,
-      status: data?.status || payload.status,
-      otp: data?.otp || payload.otp,
+      otp: handshakeOtp,
+      handshake_otp: handshakeOtp,
+      payment_method: paymentMethod,
+      total_amount: totalAmount,
+      delivery_fee: deliveryFee,
+      gst_amount: gstAmount,
       source: 'supabase_cloud',
-      last_updated_at: data?.last_updated_at || createdAt,
     };
 
     saveLocalOrder(cloudRecord);
     companionSync.notifyOrderPlaced(cloudRecord);
-    broadcastLocalOrderUpdate(cloudRecord);
+    broadcastLocalOrderUpdate(cloudRecord, {
+      id: `ev_${Date.now()}`,
+      timestamp: new Date().toLocaleTimeString(),
+      type: 'CONNECTED',
+      status: cloudRecord.status,
+      message: `Order ${cloudRecord.id} successfully placed in Supabase cloud`,
+      raw: cloudRecord,
+    });
+
     return {
       success: true,
       data: cloudRecord,
       cloudSynced: true,
     };
   } catch (err: any) {
-    console.warn('Supabase network error during placeOrder:', err);
+    console.error('Fetch error:', err, supabaseUrl);
     return {
-      success: true,
+      success: false,
       data: record,
       cloudSynced: false,
       error: err?.message || 'Network exception connecting to Supabase',
@@ -311,35 +517,63 @@ export async function placeSupabaseOrder(
 }
 
 /**
- * Fetch orders from Supabase table or local database
+ * Fetch orders from Supabase table: strictly filtered by the current customer_id's orders
  */
-export async function fetchAllOrders(): Promise<{ orders: SupabaseOrderRecord[]; isCloud: boolean }> {
+export async function fetchAllOrders(customerId?: string): Promise<{ orders: SupabaseOrderRecord[]; isCloud: boolean }> {
   const client = getSupabaseClient();
-  if (client) {
+  if (client && isSupabaseConfigured()) {
     try {
-      const { data, error } = await client
+      let query = client
         .from('orders')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(20);
+        .limit(50);
 
-      if (!error && data && data.length > 0) {
-        const formatted: SupabaseOrderRecord[] = data.map((item: any) => ({
-          id: String(item.id || item.order_id || Math.random().toString(36).substring(2, 8)),
-          created_at: item.created_at || new Date().toISOString(),
-          customer_id: item.customer_id || 'cust_123',
-          fuel_type: item.fuel_type || 'Diesel',
-          litres: Number(item.litres || 100),
-          delivery_lat: Number(item.delivery_lat || 17.4125),
-          delivery_lng: Number(item.delivery_lng || 78.3364),
-          driver_lat: item.driver_lat !== undefined ? Number(item.driver_lat) : 17.4290,
-          driver_lng: item.driver_lng !== undefined ? Number(item.driver_lng) : 78.3506,
-          driver_speed_kmh: item.driver_speed_kmh !== undefined ? Number(item.driver_speed_kmh) : 38,
-          status: item.status || 'PENDING',
-          otp: item.otp || '4821',
-          source: 'supabase_cloud',
-          last_updated_at: item.last_updated_at || item.created_at,
-        }));
+      if (customerId) {
+        query = query.eq('customer_id', customerId);
+      }
+
+      const { data, error } = await query;
+
+      if (!error && data) {
+        const formatted: SupabaseOrderRecord[] = data.map((item: any) => {
+          const localMatch = getLocalOrderById(String(item.id || item.order_id));
+          return {
+            id: String(item.id || item.order_id),
+            created_at: item.created_at || new Date().toISOString(),
+            service_type: item.service_type || 'FUEL',
+            job_kind: item.job_kind,
+            customer_id: item.customer_id,
+            customer_name: item.customer_name,
+            customer_phone: item.customer_phone,
+            fuel_type: item.fuel_type || 'Fuel',
+            litres: Number(item.litres ?? item.amount ?? 0),
+            description: item.description || item.repair_service,
+            delivery_lat: Number(item.delivery_lat || item.lat || 17.4125),
+            delivery_lng: Number(item.delivery_lng || item.lng || 78.3364),
+            customer_location: item.customer_location || `${item.delivery_lat || 17.4125}, ${item.delivery_lng || 78.3364}`,
+            address: item.address || item.delivery_address || item.repair_service || 'Hyderabad',
+            total_amount: Number(item.total_amount || item.price || item.amount || 0),
+            price: Number(item.price || item.total_amount || 0),
+            delivery_fee: Number(item.delivery_fee || 25),
+            gst_amount: Number(item.gst_amount || 0),
+            payment_method: item.payment_method || 'COD',
+            payment_status: item.payment_status || 'PENDING',
+            driver_lat: item.driver_lat !== null && item.driver_lat !== undefined ? Number(item.driver_lat) : undefined,
+            driver_lng: item.driver_lng !== null && item.driver_lng !== undefined ? Number(item.driver_lng) : undefined,
+            driver_speed_kmh: item.driver_speed_kmh !== null && item.driver_speed_kmh !== undefined ? Number(item.driver_speed_kmh) : undefined,
+            driver_name: item.driver_name,
+            driver_phone: item.driver_phone,
+            driver_vehicle: item.driver_vehicle,
+            eta_minutes: item.eta_minutes,
+            status: item.status || 'PENDING',
+            handshake_otp: localMatch?.otp || item.otp || item.handshake_otp || '',
+            otp: localMatch?.otp || item.otp || '',
+            source: 'supabase_cloud',
+            last_updated_at: item.last_updated_at || item.created_at,
+            parent_order_id: item.parent_order_id,
+          };
+        });
         return { orders: formatted, isCloud: true };
       }
     } catch (e) {
@@ -347,165 +581,82 @@ export async function fetchAllOrders(): Promise<{ orders: SupabaseOrderRecord[];
     }
   }
 
-  return { orders: getLocalOrders(), isCloud: false };
+  const local = getLocalOrders();
+  const filtered = customerId ? local.filter(o => o.customer_id === customerId) : local;
+  return { orders: filtered, isCloud: false };
 }
 
 /**
- * Update order status (PENDING -> DISPATCHED -> DELIVERED)
+ * Cancel an order: Customer app is only allowed to cancel a PENDING order.
+ * Writing any other status or updating driver details is strictly forbidden.
  */
-export async function updateOrderStatus(orderId: string, newStatus: 'PENDING' | 'DISPATCHED' | 'DELIVERED') {
-  let updatedRecord: SupabaseOrderRecord | null = null;
-  try {
-    const orders = getLocalOrders();
-    const updated = orders.map(o => {
-      if (o.id === orderId) {
-        updatedRecord = { ...o, status: newStatus, last_updated_at: new Date().toISOString() };
-        return updatedRecord;
-      }
-      return o;
-    });
-    localStorage.setItem(STORAGE_KEY_ORDERS, JSON.stringify(updated));
-  } catch (e) {
-    console.warn('Local update failed', e);
-  }
-
-  if (updatedRecord) {
-    companionSync.broadcast({
-      type: 'STATUS_CHANGE',
-      orderId,
-      status: newStatus,
-      driver_lat: (updatedRecord as SupabaseOrderRecord).driver_lat,
-      driver_lng: (updatedRecord as SupabaseOrderRecord).driver_lng,
-      message: `Order ${orderId} status updated to ${newStatus}`,
-    });
-    broadcastLocalOrderUpdate(updatedRecord, {
-      id: `ev_${Date.now()}`,
-      timestamp: new Date().toLocaleTimeString(),
-      type: 'STATUS_CHANGE',
-      status: newStatus,
-      driver_lat: (updatedRecord as SupabaseOrderRecord).driver_lat,
-      driver_lng: (updatedRecord as SupabaseOrderRecord).driver_lng,
-      message: `Order ${orderId} status changed to ${newStatus}`,
-      raw: updatedRecord,
-    });
-  }
-
-  // Update cloud if available
+export async function cancelPendingOrder(orderId: string): Promise<boolean> {
   const client = getSupabaseClient();
-  if (client) {
+  let success = false;
+  if (client && isSupabaseConfigured()) {
     try {
-      await client.from('orders').update({ 
-        status: newStatus,
-        last_updated_at: new Date().toISOString()
-      }).eq('id', orderId);
+      const { error } = await client
+        .from('orders')
+        .update({ status: 'CANCELLED' })
+        .eq('id', orderId)
+        .in('status', ['PENDING', 'pending']);
+      if (!error) success = true;
     } catch (e) {
-      console.warn('Cloud status update failed', e);
+      console.warn('Supabase cancelPendingOrder error', e);
     }
   }
+
+  // Update local copy
+  const orders = getLocalOrders();
+  const updated = orders.map(o => {
+    if (o.id === orderId && (o.status === 'PENDING' || o.status === 'pending')) {
+      return { ...o, status: 'CANCELLED' as any, last_updated_at: new Date().toISOString() };
+    }
+    return o;
+  });
+  localStorage.setItem(STORAGE_KEY_ORDERS, JSON.stringify(updated));
+  return success;
 }
 
 /**
- * Update driver location (driver_lat, driver_lng, driver_speed_kmh)
+ * Update order status wrapper:
+ * This app must NEVER write status (cancelling a PENDING order is the ONLY allowed status write).
+ */
+export async function updateOrderStatus(orderId: string, newStatus: string) {
+  if (newStatus !== 'CANCELLED') {
+    console.warn(`[Supabase] Customer app blocked from writing status '${newStatus}'. Driver app owns status transitions.`);
+    return;
+  }
+  await cancelPendingOrder(orderId);
+}
+
+/**
+ * Customer app MUST NEVER write driver coordinates to Supabase!
+ * The driver companion app writes driver_lat, driver_lng, and driver_speed_kmh.
  */
 export async function updateDriverLocation(
-  orderId: string, 
-  lat: number, 
-  lng: number, 
-  speedKmh: number = 40
+  _orderId: string, 
+  _lat: number, 
+  _lng: number, 
+  _speedKmh: number = 40
 ) {
-  let updatedRecord: SupabaseOrderRecord | null = null;
-  try {
-    const orders = getLocalOrders();
-    const updated = orders.map(o => {
-      if (o.id === orderId) {
-        updatedRecord = {
-          ...o,
-          driver_lat: Number(lat.toFixed(6)),
-          driver_lng: Number(lng.toFixed(6)),
-          driver_speed_kmh: Math.round(speedKmh),
-          last_updated_at: new Date().toISOString(),
-        };
-        return updatedRecord;
-      }
-      return o;
-    });
-    localStorage.setItem(STORAGE_KEY_ORDERS, JSON.stringify(updated));
-  } catch (e) {
-    console.warn('Local driver update failed', e);
-  }
-
-  if (updatedRecord) {
-    companionSync.broadcast({
-      type: 'DRIVER_LOCATION_UPDATE',
-      orderId,
-      driver_lat: lat,
-      driver_lng: lng,
-      speed_kmh: speedKmh,
-      status: (updatedRecord as SupabaseOrderRecord).status,
-      message: `Driver Location: ${lat.toFixed(4)}, ${lng.toFixed(4)} (${Math.round(speedKmh)} km/h)`,
-    });
-    broadcastLocalOrderUpdate(updatedRecord, {
-      id: `ev_${Date.now()}`,
-      timestamp: new Date().toLocaleTimeString(),
-      type: 'LOCATION_UPDATE',
-      driver_lat: lat,
-      driver_lng: lng,
-      speed_kmh: speedKmh,
-      status: (updatedRecord as SupabaseOrderRecord).status,
-      message: `Driver Location: ${lat.toFixed(4)}, ${lng.toFixed(4)} (${Math.round(speedKmh)} km/h)`,
-      raw: updatedRecord,
-    });
-  }
-
-  // Update cloud if available
-  const client = getSupabaseClient();
-  if (client) {
-    try {
-      await client.from('orders').update({
-        driver_lat: Number(lat.toFixed(6)),
-        driver_lng: Number(lng.toFixed(6)),
-        driver_speed_kmh: Math.round(speedKmh),
-        last_updated_at: new Date().toISOString(),
-      }).eq('id', orderId);
-    } catch (e) {
-      // Ignore schema column misses in external client
-    }
-  }
+  console.warn('[Supabase] Customer app blocked from updating driver location. Driver app writes coordinates.');
 }
 
 /**
- * Realtime Order & Driver Location Streaming
- * Matches user's Flutter / Dart pattern:
- * 
- * Supabase.instance.client
- *     .from('orders')
- *     .stream(primaryKey: ['id'])
- *     .eq('id', activeOrderId)
- *     .listen((List<Map<String, dynamic>> data) {
- *       if (data.isNotEmpty) {
- *         final order = data.first;
- *         print('Current Status: ${order['status']}');
- *         print('Driver Location: ${order['driver_lat']}, ${order['driver_lng']}');
- *       }
- *     });
+ * Realtime Order Tracking Subscriber
+ * Uses supabase.channel('order-tracking') filtered by id = current_order_id.
+ * NO automatic timers, NO automatic status transitions.
  */
 export function subscribeToOrderStream(
   orderId: string,
-  onData: OrderStreamCallback,
-  options?: {
-    simulateProgress?: boolean;
-    speedMultiplier?: number;
-  }
+  onData: OrderStreamCallback
 ): () => void {
   let isSubscribed = true;
-  const speed = options?.speedMultiplier || 1;
-  const simulate = options?.simulateProgress !== false;
 
-  // 1. Initial snapshot emit
+  // 1. Initial snapshot emit from local database
   const initialOrder = getLocalOrderById(orderId);
   if (initialOrder) {
-    console.log('[Supabase Stream Initial] Current Status:', initialOrder.status);
-    console.log('[Supabase Stream Initial] Driver Location:', initialOrder.driver_lat, initialOrder.driver_lng);
     onData(initialOrder, {
       id: `ev_init_${Date.now()}`,
       timestamp: new Date().toLocaleTimeString(),
@@ -513,74 +664,60 @@ export function subscribeToOrderStream(
       status: initialOrder.status,
       driver_lat: initialOrder.driver_lat,
       driver_lng: initialOrder.driver_lng,
-      speed_kmh: initialOrder.driver_speed_kmh,
-      message: `Stream active for order ${orderId}`,
+      message: `Connected to realtime order-tracking for ${orderId}`,
       raw: initialOrder,
     });
   }
 
-  // 2. Listen to in-memory / local window broadcast updates
+  // 2. Local window event listener (cross-component sync)
   const handleLocalEvent = (e: Event) => {
     if (!isSubscribed) return;
     const custom = e as CustomEvent<{ order: SupabaseOrderRecord; event?: StreamEventLog }>;
     if (custom.detail?.order?.id === orderId) {
-      const order = custom.detail.order;
-      console.log(`[Supabase Stream] Current Status: ${order.status}`);
-      console.log(`[Supabase Stream] Driver Location: ${order.driver_lat}, ${order.driver_lng}`);
-      onData(order, custom.detail.event);
+      onData(custom.detail.order, custom.detail.event);
     }
   };
   if (typeof window !== 'undefined') {
     window.addEventListener(EVENT_STREAM_UPDATE, handleLocalEvent);
   }
 
-  // 3. Listen to Companion App (4d28260b-2153-449e-8927-36441be4e78c) Live Sync
+  // 3. Companion App live sync listener
   const unsubscribeCompanion = companionSync.subscribe((msg) => {
     if (!isSubscribed) return;
     if (msg.orderId === orderId || msg.order?.id === orderId) {
       const existing = getLocalOrderById(orderId);
       if (existing) {
-        let hasChanges = false;
-        const updated = { ...existing };
-        if (msg.status && msg.status !== updated.status) {
-          updated.status = msg.status as any;
-          hasChanges = true;
-        }
-        if (msg.driver_lat !== undefined && msg.driver_lng !== undefined) {
-          updated.driver_lat = msg.driver_lat;
-          updated.driver_lng = msg.driver_lng;
-          hasChanges = true;
-        }
-        if (msg.speed_kmh !== undefined) {
-          updated.driver_speed_kmh = msg.speed_kmh;
-          hasChanges = true;
-        }
-
-        if (hasChanges) {
-          saveLocalOrder(updated);
-          onData(updated, {
-            id: `ev_comp_${Date.now()}`,
-            timestamp: new Date().toLocaleTimeString(),
-            type: msg.type === 'STATUS_CHANGE' ? 'STATUS_CHANGE' : 'LOCATION_UPDATE',
-            status: updated.status,
-            driver_lat: updated.driver_lat,
-            driver_lng: updated.driver_lng,
-            speed_kmh: updated.driver_speed_kmh,
-            message: `Companion App (4d28260b): ${msg.message || msg.type}`,
-            raw: msg,
-          });
-        }
+        const updated: SupabaseOrderRecord = {
+          ...existing,
+          ...(msg.status ? { status: msg.status as any } : {}),
+          ...(msg.driver_lat !== undefined ? { driver_lat: msg.driver_lat } : {}),
+          ...(msg.driver_lng !== undefined ? { driver_lng: msg.driver_lng } : {}),
+          ...(msg.speed_kmh !== undefined ? { driver_speed_kmh: msg.speed_kmh } : {}),
+          last_updated_at: new Date().toISOString(),
+        };
+        saveLocalOrder(updated);
+        onData(updated, {
+          id: `ev_comp_${Date.now()}`,
+          timestamp: new Date().toLocaleTimeString(),
+          type: 'STATUS_CHANGE',
+          status: updated.status,
+          driver_lat: updated.driver_lat,
+          driver_lng: updated.driver_lng,
+          speed_kmh: updated.driver_speed_kmh,
+          message: msg.message || `Companion App updated status: ${updated.status}`,
+          raw: msg,
+        });
       }
     }
   });
 
-  // 3. Supabase Cloud Realtime Channel (if client is configured)
+  // 4. Supabase Cloud Realtime Channel: supabase.channel('order-tracking')
   const client = getSupabaseClient();
   let channel: any = null;
   if (client) {
     try {
       channel = client
-        .channel(`order-stream-${orderId}`)
+        .channel('order-tracking')
         .on(
           'postgres_changes',
           {
@@ -593,18 +730,16 @@ export function subscribeToOrderStream(
             if (!isSubscribed) return;
             const updated = payload.new as SupabaseOrderRecord;
             if (updated) {
-              console.log(`[Supabase Cloud Stream] Current Status: ${updated.status}`);
-              console.log(`[Supabase Cloud Stream] Driver Location: ${updated.driver_lat}, ${updated.driver_lng}`);
               saveLocalOrder(updated);
               onData(updated, {
                 id: `ev_cloud_${Date.now()}`,
                 timestamp: new Date().toLocaleTimeString(),
-                type: 'SYNC',
+                type: 'STATUS_CHANGE',
                 status: updated.status,
                 driver_lat: updated.driver_lat,
                 driver_lng: updated.driver_lng,
                 speed_kmh: updated.driver_speed_kmh,
-                message: `Cloud Postgres push: ${updated.status}`,
+                message: `Supabase channel('order-tracking'): status is ${updated.status}`,
                 raw: payload,
               });
             }
@@ -612,59 +747,14 @@ export function subscribeToOrderStream(
         )
         .subscribe();
     } catch (e) {
-      console.warn('Realtime channel subscription error:', e);
+      console.warn('Realtime channel order-tracking error:', e);
     }
   }
 
-  // 4. GPS Route Interpolation Simulator (advances driver marker realistically toward destination)
-  let simTimer: NodeJS.Timeout | null = null;
-  if (simulate) {
-    let step = 0;
-    const totalSteps = 24;
-
-    simTimer = setInterval(() => {
-      if (!isSubscribed) return;
-      const current = getLocalOrderById(orderId);
-      if (!current || current.status === 'DELIVERED') {
-        return;
-      }
-
-      // If pending, change to dispatched after step 2
-      if (current.status === 'PENDING' && step >= 2) {
-        updateOrderStatus(orderId, 'DISPATCHED');
-        return;
-      }
-
-      if (current.status === 'DISPATCHED') {
-        step++;
-        const targetLat = current.delivery_lat || 17.4125;
-        const targetLng = current.delivery_lng || 78.3364;
-        const startLat = targetLat + 0.0165;
-        const startLng = targetLng + 0.0142;
-
-        const fraction = Math.min(step / totalSteps, 1);
-        // Add subtle road curvature
-        const curveLat = Math.sin(fraction * Math.PI) * 0.0025;
-        const curveLng = Math.cos(fraction * Math.PI) * 0.0018;
-
-        const nextLat = startLat + (targetLat - startLat) * fraction + curveLat;
-        const nextLng = startLng + (targetLng - startLng) * fraction + curveLng;
-        const speedKmh = fraction >= 0.95 ? 12 : Math.round(35 + Math.sin(step) * 10);
-
-        updateDriverLocation(orderId, nextLat, nextLng, speedKmh);
-
-        if (fraction >= 1) {
-          updateOrderStatus(orderId, 'DELIVERED');
-        }
-      }
-    }, Math.max(1000, 2400 / speed));
-  }
-
-  // Return unsubscribe cleanup function
+  // Cleanup: purely unbinds listeners, NO fake timer loops
   return () => {
     isSubscribed = false;
     unsubscribeCompanion();
-    if (simTimer) clearInterval(simTimer);
     if (typeof window !== 'undefined') {
       window.removeEventListener(EVENT_STREAM_UPDATE, handleLocalEvent);
     }

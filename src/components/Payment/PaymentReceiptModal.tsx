@@ -11,9 +11,9 @@ import {
   ShieldCheck, 
   Clock 
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PaymentTransactionInfo, Product } from '../../types';
-import { FUGO_GSTIN, FUGO_MERCHANT_NAME } from '../../services/payment';
+import { fetchAppSettings, AppSettings } from '../../services/supabase';
 
 interface PaymentReceiptModalProps {
   isOpen: boolean;
@@ -34,6 +34,22 @@ export default function PaymentReceiptModal({
 }: PaymentReceiptModalProps) {
   const [copiedTxn, setCopiedTxn] = useState(false);
   const [copiedInvoice, setCopiedInvoice] = useState(false);
+  const [settings, setSettings] = useState<AppSettings>({
+    merchant_vpa: '',
+    merchant_name: 'Fugo',
+    gstin: '',
+    transport_fee: 0,
+  });
+
+  useEffect(() => {
+    let active = true;
+    fetchAppSettings().then((res) => {
+      if (active) setSettings(res);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   if (!isOpen) return null;
 
@@ -61,7 +77,7 @@ export default function PaymentReceiptModal({
           exit={{ scale: 0.9, opacity: 0, y: 20 }}
           className="bg-white rounded-[32px] max-w-md w-full shadow-2xl overflow-hidden border border-slate-100 my-6"
         >
-          {/* Header Banner */}
+          {/* Header Banner - strictly Pay on delivery */}
           <div className="bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 text-white p-6 text-center relative overflow-hidden">
             <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-2xl -mr-20 -mt-20 pointer-events-none" />
             
@@ -69,12 +85,14 @@ export default function PaymentReceiptModal({
               <CheckCircle2 className="w-10 h-10 text-emerald-600" />
             </div>
             
-            <h2 className="text-xl font-black tracking-tight">Payment Verified & Received</h2>
-            <p className="text-xs text-emerald-100 mt-1">Official Tax Invoice & Delivery Voucher</p>
+            <h2 className="text-xl font-black tracking-tight">
+              Pay on delivery: ₹{payment.amount}
+            </h2>
+            <p className="text-xs text-emerald-100 mt-1">Order Confirmed • Pay Cash or UPI to Driver</p>
             
             <div className="mt-4 pt-3 border-t border-emerald-500/40 flex items-center justify-center gap-2">
               <span className="text-[11px] font-mono font-bold tracking-widest bg-emerald-950/40 px-3 py-1 rounded-full text-emerald-200">
-                {payment.status === 'PAID' ? 'TRANSACTION SETTLED' : 'PAYMENT ON ARRIVAL CONFIRMED'}
+                PAY ON DELIVERY
               </span>
             </div>
           </div>
@@ -95,20 +113,22 @@ export default function PaymentReceiptModal({
               </div>
 
               <div className="flex justify-between items-center">
-                <span className="text-slate-400 font-medium">Transaction ID</span>
+                <span className="text-slate-400 font-medium">Order ID</span>
                 <button
-                  onClick={() => handleCopy(payment.transactionId, 'txn')}
+                  onClick={() => handleCopy(orderId, 'txn')}
                   className="flex items-center gap-1 font-mono text-[11px] font-bold text-slate-700 hover:text-orange-600 transition-colors"
                 >
-                  <span>{payment.transactionId}</span>
+                  <span>{orderId}</span>
                   {copiedTxn ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3 text-slate-400" />}
                 </button>
               </div>
 
-              <div className="flex justify-between items-center">
-                <span className="text-slate-400 font-medium">Bank Reference (RRN)</span>
-                <span className="font-mono text-slate-700">{payment.rrn}</span>
-              </div>
+              {payment.rrn && (
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400 font-medium">Reference</span>
+                  <span className="font-mono text-slate-700">{payment.rrn}</span>
+                </div>
+              )}
 
               <div className="flex justify-between items-center">
                 <span className="text-slate-400 font-medium">Payment Mode</span>
@@ -133,7 +153,7 @@ export default function PaymentReceiptModal({
 
               {payment.upiVpa && (
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-400 font-medium">UPI VPA</span>
+                  <span className="text-slate-400 font-medium">Merchant UPI VPA</span>
                   <span className="font-mono text-slate-700">{payment.upiVpa}</span>
                 </div>
               )}
@@ -143,10 +163,12 @@ export default function PaymentReceiptModal({
                 <span className="text-slate-700 font-mono text-[11px]">{payment.paidAt}</span>
               </div>
 
-              <div className="flex justify-between items-center pt-1 border-t border-slate-200">
-                <span className="text-slate-400 font-medium">Merchant GSTIN</span>
-                <span className="font-mono font-bold text-slate-600">{FUGO_GSTIN}</span>
-              </div>
+              {settings.gstin && (
+                <div className="flex justify-between items-center pt-1 border-t border-slate-200">
+                  <span className="text-slate-400 font-medium">Merchant GSTIN</span>
+                  <span className="font-mono font-bold text-slate-600">{settings.gstin}</span>
+                </div>
+              )}
             </div>
 
             {/* Line Items Table */}
@@ -186,7 +208,7 @@ export default function PaymentReceiptModal({
                 <span>₹{payment.gstAmount}</span>
               </div>
               <div className="flex justify-between items-center pt-2 border-t border-slate-200 text-sm font-black text-slate-900">
-                <span>Total Amount Paid</span>
+                <span>Total to Pay on Delivery</span>
                 <span className="text-emerald-600 text-lg">₹{payment.amount}</span>
               </div>
             </div>
@@ -204,16 +226,14 @@ export default function PaymentReceiptModal({
                 onClick={() => {
                   const receiptBlob = new Blob([
                     `========================================\n` +
-                    `       FUGO ENERGY LOGISTICS PVT LTD   \n` +
-                    `       GSTIN: ${FUGO_GSTIN}            \n` +
+                    `       ${settings.merchant_name.toUpperCase()} \n` +
+                    (settings.gstin ? `       GSTIN: ${settings.gstin}            \n` : '') +
                     `========================================\n` +
-                    `TAX INVOICE: ${payment.invoiceNumber}\n` +
+                    `INVOICE: ${payment.invoiceNumber}\n` +
                     `ORDER ID: ${orderId}\n` +
-                    `TRANSACTION ID: ${payment.transactionId}\n` +
-                    `BANK RRN: ${payment.rrn}\n` +
                     `DATE: ${payment.paidAt}\n` +
                     `PAYMENT METHOD: ${payment.methodTitle}\n` +
-                    `STATUS: ${payment.status}\n` +
+                    `PAYMENT STATUS: PAY ON DELIVERY\n` +
                     `----------------------------------------\n` +
                     `ITEMS:\n` +
                     items.map(i => ` - ${i.product.name} (${i.quantity} ${i.product.unit}): Rs ${i.quantity * i.product.price}`).join('\n') +
@@ -221,7 +241,7 @@ export default function PaymentReceiptModal({
                     `Subtotal: Rs ${payment.subtotal}\n` +
                     `Delivery Fee: Rs ${payment.deliveryFee}\n` +
                     `GST Tax: Rs ${payment.gstAmount}\n` +
-                    `TOTAL PAID: Rs ${payment.amount}\n` +
+                    `TOTAL TO PAY ON DELIVERY: Rs ${payment.amount}\n` +
                     `DELIVERY ADDRESS: ${deliveryAddress}\n` +
                     `========================================\n` +
                     `Verified & Digitally Signed\n`

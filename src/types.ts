@@ -5,9 +5,13 @@ export interface UserLocation {
   city: string;
   lat: number;
   lng: number;
+  houseNumber?: string;
+  landmark?: string;
+  tag?: 'Home' | 'Work' | 'Other';
+  isLiveLocation?: boolean;
 }
 
-export type Screen = 'login' | 'home' | 'fuel' | 'parts' | 'services' | 'checkout' | 'tracking' | 'settings' | 'notifications' | 'orders' | 'addresses' | 'profile' | 'language' | 'darkMode' | 'payments' | 'fuelPrices' | 'analytics' | 'appointment' | 'appointment_tracking' | 'supabase_orders' | 'central_system';
+export type Screen = 'login' | 'home' | 'fuel' | 'parts' | 'services' | 'checkout' | 'tracking' | 'settings' | 'notifications' | 'orders' | 'addresses' | 'profile' | 'language' | 'darkMode' | 'payments' | 'fuelPrices' | 'analytics' | 'appointment' | 'appointment_tracking';
 
 export interface Product {
   id: string;
@@ -27,18 +31,43 @@ export interface Product {
   warranty?: string;
 }
 
+export type ServiceType = 'FUEL' | 'PARTS' | 'REPAIR' | 'SERVICE' | 'MAINTENANCE';
+
 export interface SupabaseOrderPayload {
-  customer_id: string;
-  fuel_type: string;
-  litres: number;
-  delivery_lat: number;
-  delivery_lng: number;
+  id?: string;
+  service_type: ServiceType | string;
+  status: 'PENDING' | 'ACCEPTED' | 'DISPATCHED' | 'IN_TRANSIT' | 'ARRIVED' | 'DELIVERED' | 'COMPLETED' | 'CANCELLED' | 'pending' | 'completed' | string;
+  handshake_otp?: string;
+  otp?: string;
+  payment_status?: 'PAID' | 'UNPAID' | string;
+  customer_location?: string;
+  address?: string;
+  total_amount?: number;
+  price?: number;
+  customer_id?: string;
+  customer_name?: string;
+  customer_phone?: string;
+  fuel_type?: string;
+  litres?: number;
+  description?: string;
+  repair_service?: string;
+  delivery_lat?: number;
+  delivery_lng?: number;
+  lat?: number;
+  lng?: number;
   driver_lat?: number;
   driver_lng?: number;
   driver_speed_kmh?: number;
-  status: 'PENDING' | 'DISPATCHED' | 'DELIVERED' | 'CANCELLED';
-  otp: string;
+  driver_name?: string;
+  driver_phone?: string;
+  driver_vehicle?: string;
+  eta_minutes?: number;
   last_updated_at?: string;
+  parent_order_id?: string;
+  payment_method?: 'COD' | 'UPI' | string;
+  delivery_fee?: number;
+  gst_amount?: number;
+  job_kind?: 'VEHICLE_PICKUP' | 'VEHICLE_RETURN' | string;
 }
 
 export interface SupabaseOrderRecord extends SupabaseOrderPayload {
@@ -62,6 +91,7 @@ export interface StreamEventLog {
 export type OrderStreamCallback = (data: SupabaseOrderRecord, event?: StreamEventLog) => void;
 
 export type PaymentMethodCategory = 
+  | 'cod'
   | 'upi' 
   | 'card' 
   | 'netbanking' 
@@ -74,10 +104,10 @@ export interface PaymentTransactionInfo {
   method: PaymentMethodCategory;
   methodTitle: string;
   transactionId: string;
-  rrn: string; // Retrieval Reference Number (Bank RRN)
-  authCode: string;
+  rrn?: string; // Optional (fake codes removed)
+  authCode?: string; // Optional (fake codes removed)
   paidAt: string;
-  status: 'PAID' | 'PENDING_ON_DELIVERY';
+  status: 'PAID' | 'PENDING_ON_DELIVERY' | 'PAY_ON_DELIVERY';
   amount: number;
   subtotal: number;
   deliveryFee: number;
@@ -101,16 +131,23 @@ export interface PaymentTransactionInfo {
 
 export interface Order {
   id: string;
+  service_type: ServiceType | string;
   items: { product: Product; quantity: number }[];
-  status: 'processing' | 'dispatched' | 'nearby' | 'delivered';
+  status: 'pending' | 'processing' | 'dispatched' | 'in_transit' | 'nearby' | 'delivered' | 'completed' | string;
   total: number;
+  total_amount: number;
+  price?: number;
   deliveryFee: number;
   distance: number;
   deliveryAddress: string;
+  address?: string;
+  customer_location?: string;
   estimatedTime: number; // in minutes
   createdAt: number;
   // Supabase specific fields
   customer_id: string;
+  customer_phone?: string;
+  description?: string;
   fuel_type: string;
   litres: number;
   delivery_lat: number;
@@ -118,11 +155,20 @@ export interface Order {
   driver_lat?: number;
   driver_lng?: number;
   driver_speed_kmh?: number;
+  driver_name?: string;
+  driver_phone?: string;
+  driver_vehicle?: string;
+  eta_minutes?: number;
   otp: string;
-  supabase_status: 'PENDING' | 'DISPATCHED' | 'DELIVERED';
+  handshake_otp: string;
+  payment_status: 'PAID' | 'UNPAID' | string;
+  supabase_status: 'PENDING' | 'ACCEPTED' | 'DISPATCHED' | 'IN_TRANSIT' | 'ARRIVED' | 'DELIVERED' | 'COMPLETED' | 'CANCELLED' | string;
   synced_to_supabase: boolean;
   last_updated_at?: string;
   payment?: PaymentTransactionInfo;
+  parent_order_id?: string;
+  payment_method?: 'COD' | 'UPI' | string;
+  job_kind?: 'VEHICLE_PICKUP' | 'VEHICLE_RETURN' | string;
 }
 
 export interface CompanionSyncEvent {

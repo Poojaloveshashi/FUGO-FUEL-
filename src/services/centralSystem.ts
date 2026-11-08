@@ -8,7 +8,6 @@
  */
 
 import { getLocalOrders, placeSupabaseOrder } from './supabase';
-import { getWalletBalance, updateWalletBalance } from './payment';
 import { companionSync, COMPANION_APP_URL, COMPANION_APP_ID } from './companionSync';
 import { SPARE_PARTS_MASTER_CATALOG } from '../data/sparePartsCatalog';
 import { SupabaseOrderRecord } from '../types';

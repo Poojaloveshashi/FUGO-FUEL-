@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { AlertTriangle } from 'lucide-react';
 import { Screen, Product, Order, UserLocation, PaymentTransactionInfo } from './types';
 import Login from './components/Screens/Login';
 import Home from './components/Screens/Home';
@@ -26,10 +27,8 @@ import ServiceAnalytics from './components/Screens/ServiceAnalytics';
 import AppointmentBooking from './components/Screens/AppointmentBooking';
 import RepairTracking from './components/Screens/RepairTracking';
 
-import SupabaseOrders from './components/Screens/SupabaseOrders';
-import CentralSystem from './components/Screens/CentralSystem';
 import SOSModal from './components/Screens/SOSModal';
-import { placeSupabaseOrder, generateDeliveryOtp, updateOrderStatus } from './services/supabase';
+import { placeSupabaseOrder, generateDeliveryOtp, updateOrderStatus, getCustomerIdFromPhone, supabaseUrl } from './services/supabase';
 
 // Sample data for initial population
 const FUEL_PRODUCTS: Product[] = [
@@ -51,21 +50,144 @@ const SERVICES: Product[] = [
 ];
 
 const HYDERABAD_LOCATIONS: UserLocation[] = [
-  { id: 'h3', name: 'Gachibowli', address: 'DLF Cyber City, Gachibowli', city: 'Hyderabad', lat: 17.4125, lng: 78.3364 },
-  { id: 'h1', name: 'Banjara Hills', address: 'Road No. 1, Banjara Hills', city: 'Hyderabad', lat: 17.4156, lng: 78.4357 },
-  { id: 'h2', name: 'Jubilee Hills', address: 'Road No. 36, Jubilee Hills', city: 'Hyderabad', lat: 17.4319, lng: 78.4073 },
-  { id: 'h4', name: 'Hitech City', address: 'Mindspace IT Park, Hitech City', city: 'Hyderabad', lat: 17.4435, lng: 78.3772 },
-  { id: 'b1', name: 'MG Road', address: 'No 42, 2nd Cross, MG Road', city: 'Bangalore', lat: 12.9716, lng: 77.5946 },
+  { 
+    id: 'h3', 
+    name: 'Gachibowli Cyber Hub', 
+    houseNumber: 'Plot 4, Block B',
+    address: 'DLF Cyber City, Gachibowli', 
+    city: 'Hyderabad', 
+    lat: 17.4125, 
+    lng: 78.3364,
+    tag: 'Work',
+    landmark: 'Opposite DLF Gate 2'
+  },
+  { 
+    id: 'h1', 
+    name: 'Banjara Hills Residence', 
+    houseNumber: 'Villa 12, Park View',
+    address: 'Road No. 1, Banjara Hills', 
+    city: 'Hyderabad', 
+    lat: 17.4156, 
+    lng: 78.4357,
+    tag: 'Home',
+    landmark: 'Beside Taj Krishna'
+  },
+  { 
+    id: 'h2', 
+    name: 'Jubilee Hills Apt', 
+    houseNumber: 'Flat 401, Sapphire Tower',
+    address: 'Road No. 36, Jubilee Hills', 
+    city: 'Hyderabad', 
+    lat: 17.4319, 
+    lng: 78.4073,
+    tag: 'Home',
+    landmark: 'Near Peddamma Temple Metro'
+  },
+  { 
+    id: 'h4', 
+    name: 'Mindspace IT Park', 
+    houseNumber: 'Building No 12, 5th Floor',
+    address: 'Mindspace IT Park, Hitech City', 
+    city: 'Hyderabad', 
+    lat: 17.4435, 
+    lng: 78.3772,
+    tag: 'Work',
+    landmark: 'Behind Inorbit Mall'
+  },
+  { 
+    id: 'b1', 
+    name: 'MG Road Office', 
+    houseNumber: 'No 42, 2nd Cross',
+    address: 'MG Road', 
+    city: 'Bangalore', 
+    lat: 12.9716, 
+    lng: 77.5946,
+    tag: 'Work',
+    landmark: 'Opposite Metro Pillar 128'
+  },
 ];
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
-  const [user, setUser] = useState<{ phone: string } | null>({ phone: '+91 98765 43210' });
+  const [user, setUser] = useState<{ phone: string } | null>(() => {
+    try {
+      const savedUser = localStorage.getItem('fugo_user');
+      if (savedUser && savedUser !== 'undefined') {
+        const parsed = JSON.parse(savedUser);
+        if (parsed && parsed.phone) return parsed;
+      }
+    } catch (e) {
+      console.error('Failed to parse user', e);
+    }
+    return null;
+  });
   const [cart, setCart] = useState<{ product: Product; quantity: number }[]>([]);
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
-  const [selectedLocation, setSelectedLocation] = useState<UserLocation>(HYDERABAD_LOCATIONS[0]);
+  const [locationsList, setLocationsList] = useState<UserLocation[]>(() => {
+    try {
+      const stored = localStorage.getItem('fugo_user_locations');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.warn('Failed to parse saved locations', e);
+    }
+    return HYDERABAD_LOCATIONS;
+  });
+  const [selectedLocation, setSelectedLocation] = useState<UserLocation>(() => {
+    try {
+      const stored = localStorage.getItem('fugo_selected_location');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.name) return parsed;
+      }
+    } catch (e) {
+      console.warn('Failed to parse selected location', e);
+    }
+    return HYDERABAD_LOCATIONS[0];
+  });
+  const [activeRepairOrderId, setActiveRepairOrderId] = useState<string | null>(null);
+  const [serverErrorBanner, setServerErrorBanner] = useState<string | null>(null);
 
   const [isSosModalOpen, setIsSosModalOpen] = useState(false);
+
+  const handleSelectLocation = (loc: UserLocation) => {
+    setSelectedLocation(loc);
+    try {
+      localStorage.setItem('fugo_selected_location', JSON.stringify(loc));
+    } catch (e) {
+      console.warn('Failed to save selected location', e);
+    }
+  };
+
+  const handleAddNewLocation = (newLoc: UserLocation) => {
+    setLocationsList(prev => {
+      const updated = [newLoc, ...prev.filter(l => l.id !== newLoc.id)];
+      try {
+        localStorage.setItem('fugo_user_locations', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Failed to save locations list', e);
+      }
+      return updated;
+    });
+    handleSelectLocation(newLoc);
+  };
+
+  const handleDeleteLocation = (id: string) => {
+    setLocationsList(prev => {
+      const updated = prev.filter(l => l.id !== id);
+      try {
+        localStorage.setItem('fugo_user_locations', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Failed to save locations list', e);
+      }
+      if (selectedLocation.id === id && updated.length > 0) {
+        handleSelectLocation(updated[0]);
+      }
+      return updated;
+    });
+  };
 
   // Authentication persistence simulation
   useEffect(() => {
@@ -76,8 +198,6 @@ export default function App() {
         if (parsed && parsed.phone) {
           setUser(parsed);
         }
-      } else {
-        localStorage.setItem('fugo_user', JSON.stringify({ phone: '+91 98765 43210' }));
       }
     } catch (e) {
       console.error('Failed to load user', e);
@@ -109,47 +229,73 @@ export default function App() {
 
   // Direct "Order Fuel" handler with status 'PENDING', 4-digit OTP, and immediate real-time tracking
   const handleOrderFuelDirect = async (product: Product, quantity: number) => {
-    const customerId = user?.phone ? `cust_${user.phone}` : 'cust_123';
-    const deliveryLat = selectedLocation.lat ?? 17.4125;
-    const deliveryLng = selectedLocation.lng ?? 78.3364;
-    const otp = generateDeliveryOtp();
-    const deliveryFee = 25;
-    const total = (product.price * quantity) + deliveryFee;
+    try {
+      const customerId = getCustomerIdFromPhone(user?.phone);
+      const deliveryLat = selectedLocation.lat ?? 17.4125;
+      const deliveryLng = selectedLocation.lng ?? 78.3364;
+      const otp = generateDeliveryOtp();
+      const deliveryFee = 25;
+      const total = (product.price * quantity) + deliveryFee;
+      const address = `${selectedLocation.name}: ${selectedLocation.address}, ${selectedLocation.city}`;
 
-    const supabaseRes = await placeSupabaseOrder({
-      customer_id: customerId,
-      fuel_type: product.name,
-      litres: quantity,
-      delivery_lat: deliveryLat,
-      delivery_lng: deliveryLng,
-      status: 'PENDING',
-      otp: otp,
-    });
+      const supabaseRes = await placeSupabaseOrder({
+        service_type: 'FUEL',
+        status: 'PENDING',
+        handshake_otp: otp,
+        otp: otp,
+        payment_status: 'UNPAID',
+        customer_location: `${deliveryLat}, ${deliveryLng}`,
+        address: address,
+        total_amount: total,
+        price: total,
+        customer_phone: user?.phone || '',
+        customer_id: customerId,
+        fuel_type: product.name,
+        litres: quantity,
+        delivery_lat: deliveryLat,
+        delivery_lng: deliveryLng,
+      });
 
-    const newOrder: Order = {
-      id: supabaseRes.data.id || `ORD-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-      items: [{ product, quantity }],
-      status: 'processing',
-      total,
-      deliveryFee,
-      distance: 0.35,
-      deliveryAddress: `${selectedLocation.name}: ${selectedLocation.address}, ${selectedLocation.city}`,
-      estimatedTime: 15,
-      createdAt: Date.now(),
-      customer_id: customerId,
-      fuel_type: product.name,
-      litres: quantity,
-      delivery_lat: deliveryLat,
-      delivery_lng: deliveryLng,
-      driver_lat: supabaseRes.data.driver_lat,
-      driver_lng: supabaseRes.data.driver_lng,
-      driver_speed_kmh: supabaseRes.data.driver_speed_kmh,
-      otp: otp,
-      supabase_status: 'PENDING',
-      synced_to_supabase: supabaseRes.cloudSynced,
-    };
-    setActiveOrder(newOrder);
-    setCurrentScreen('tracking');
+      if (!supabaseRes.success) {
+        setServerErrorBanner(supabaseRes.error || 'Failed to insert order into public.orders');
+        return;
+      }
+      setServerErrorBanner(null);
+
+      const newOrder: Order = {
+        id: supabaseRes.data.id,
+        service_type: 'FUEL',
+        items: [{ product, quantity }],
+        status: 'processing',
+        total,
+        total_amount: total,
+        deliveryFee,
+        distance: 0.35,
+        deliveryAddress: address,
+        address: address,
+        customer_location: `${deliveryLat}, ${deliveryLng}`,
+        estimatedTime: 15,
+        createdAt: Date.now(),
+        customer_id: customerId,
+        fuel_type: product.name,
+        litres: quantity,
+        delivery_lat: deliveryLat,
+        delivery_lng: deliveryLng,
+        driver_lat: supabaseRes.data.driver_lat,
+        driver_lng: supabaseRes.data.driver_lng,
+        driver_speed_kmh: supabaseRes.data.driver_speed_kmh,
+        otp: otp,
+        handshake_otp: otp,
+        payment_status: 'UNPAID',
+        supabase_status: 'PENDING',
+        synced_to_supabase: supabaseRes.cloudSynced,
+      };
+      setActiveOrder(newOrder);
+      setCurrentScreen('tracking');
+    } catch (err: any) {
+      console.error('Fetch error:', err, supabaseUrl);
+      setServerErrorBanner(err?.message || 'Failed to insert order into public.orders');
+    }
   };
 
   // Direct "Request SOS" handler with status 'PENDING', 4-digit OTP, and immediate real-time tracking
@@ -158,113 +304,181 @@ export default function App() {
     fuelType: string = 'Emergency Fuel Rescue',
     litres: number = 10
   ) => {
-    const customerId = user?.phone ? `cust_sos_${user.phone}` : 'cust_sos_emergency';
-    const deliveryLat = selectedLocation.lat ?? 17.4125;
-    const deliveryLng = selectedLocation.lng ?? 78.3364;
-    const otp = generateDeliveryOtp();
-    const total = 450; // Flat roadside rescue fee
+    try {
+      const customerId = getCustomerIdFromPhone(user?.phone);
+      const deliveryLat = selectedLocation.lat ?? 17.4125;
+      const deliveryLng = selectedLocation.lng ?? 78.3364;
+      const otp = generateDeliveryOtp();
+      const total = 450; // Flat roadside rescue fee
+      const address = `${selectedLocation.name}: ${selectedLocation.address}, ${selectedLocation.city}`;
 
-    const supabaseRes = await placeSupabaseOrder({
-      customer_id: customerId,
-      fuel_type: `${sosTitle}: ${fuelType}`,
-      litres: litres || 10,
-      delivery_lat: deliveryLat,
-      delivery_lng: deliveryLng,
-      status: 'PENDING',
-      otp: otp,
-    });
+      const supabaseRes = await placeSupabaseOrder({
+        service_type: 'FUEL',
+        status: 'PENDING',
+        handshake_otp: otp,
+        otp: otp,
+        payment_status: 'UNPAID',
+        customer_location: `${deliveryLat}, ${deliveryLng}`,
+        address: address,
+        total_amount: total,
+        price: total,
+        customer_phone: user?.phone || '',
+        customer_id: customerId,
+        fuel_type: `${sosTitle}: ${fuelType}`,
+        litres: litres || 10,
+        delivery_lat: deliveryLat,
+        delivery_lng: deliveryLng,
+      });
 
-    const newOrder: Order = {
-      id: supabaseRes.data.id || `SOS-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-      items: [
-        {
-          product: {
-            id: 'sos_emergency_item',
-            name: `${sosTitle} - ${fuelType}`,
-            price: total,
-            unit: 'SOS',
-            description: `Priority breakdown rescue at ${selectedLocation.name}`,
-            image: 'https://images.unsplash.com/photo-1615906659123-23d3408667be?auto=format&fit=crop&q=80&w=400',
-            category: 'service',
+      if (!supabaseRes.success) {
+        setServerErrorBanner(supabaseRes.error || 'Failed to insert order into public.orders');
+        return;
+      }
+      setServerErrorBanner(null);
+
+      const newOrder: Order = {
+        id: supabaseRes.data.id,
+        service_type: 'FUEL',
+        items: [
+          {
+            product: {
+              id: 'sos_emergency_item',
+              name: `${sosTitle} - ${fuelType}`,
+              price: total,
+              unit: 'SOS',
+              description: `Priority breakdown rescue at ${selectedLocation.name}`,
+              image: 'https://images.unsplash.com/photo-1615906659123-23d3408667be?auto=format&fit=crop&q=80&w=400',
+              category: 'service',
+            },
+            quantity: 1,
           },
-          quantity: 1,
-        },
-      ],
-      status: 'processing',
-      total,
-      deliveryFee: 0,
-      distance: 0.25,
-      deliveryAddress: `EMERGENCY SOS: ${selectedLocation.name}, ${selectedLocation.address}`,
-      estimatedTime: 12,
-      createdAt: Date.now(),
-      customer_id: customerId,
-      fuel_type: `${sosTitle}: ${fuelType}`,
-      litres: litres || 10,
-      delivery_lat: deliveryLat,
-      delivery_lng: deliveryLng,
-      driver_lat: supabaseRes.data.driver_lat,
-      driver_lng: supabaseRes.data.driver_lng,
-      driver_speed_kmh: supabaseRes.data.driver_speed_kmh,
-      otp: otp,
-      supabase_status: 'PENDING',
-      synced_to_supabase: supabaseRes.cloudSynced,
-    };
-    setActiveOrder(newOrder);
-    setIsSosModalOpen(false);
-    setCurrentScreen('tracking');
+        ],
+        status: 'processing',
+        total,
+        total_amount: total,
+        deliveryFee: 0,
+        distance: 0.25,
+        deliveryAddress: address,
+        address: address,
+        customer_location: `${deliveryLat}, ${deliveryLng}`,
+        estimatedTime: 12,
+        createdAt: Date.now(),
+        customer_id: customerId,
+        fuel_type: `${sosTitle}: ${fuelType}`,
+        litres: litres || 10,
+        delivery_lat: deliveryLat,
+        delivery_lng: deliveryLng,
+        driver_lat: supabaseRes.data.driver_lat,
+        driver_lng: supabaseRes.data.driver_lng,
+        driver_speed_kmh: supabaseRes.data.driver_speed_kmh,
+        otp: otp,
+        handshake_otp: otp,
+        payment_status: 'UNPAID',
+        supabase_status: 'PENDING',
+        synced_to_supabase: supabaseRes.cloudSynced,
+      };
+      setActiveOrder(newOrder);
+      setIsSosModalOpen(false);
+      setCurrentScreen('tracking');
+    } catch (err: any) {
+      console.error('Fetch error:', err, supabaseUrl);
+      setServerErrorBanner(err?.message || 'Failed to insert order into public.orders');
+    }
   };
 
-  const placeOrder = async (address: string, fee: number, dist: number, payment?: PaymentTransactionInfo) => {
-    const total = cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0) + fee;
-    
-    // Extract fuel parameters or defaults to match schema:
-    // fuel_type: 'Diesel', litres: 100, delivery_lat: 17.4125, delivery_lng: 78.3364, status: 'PENDING', otp: '4821'
-    const fuelItem = cart.find(item => item.product.category === 'fuel');
-    const fuelType = fuelItem ? fuelItem.product.name : 'Diesel';
-    const litres = fuelItem ? fuelItem.quantity : 100;
-    const customerId = user?.phone ? `cust_${user.phone}` : 'cust_123';
-    const deliveryLat = selectedLocation.lat ?? 17.4125;
-    const deliveryLng = selectedLocation.lng ?? 78.3364;
-    const otp = generateDeliveryOtp();
+  const handleOrderSubmit = async (address: string, fee: number, dist: number, payment?: PaymentTransactionInfo): Promise<boolean> => {
+    try {
+      const total = cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0) + fee;
+      
+      // Checkout: send FUEL only if the cart has a fuel item.
+      // Otherwise send service_type 'PARTS', fuel_type = short item summary (e.g. "Brake pad x2, Battery x1"), litres 0, description = the items
+      const hasFuel = cart.some(item => item.product.category === 'fuel');
+      const fuelItem = cart.find(item => item.product.category === 'fuel');
+      const serviceType: 'FUEL' | 'PARTS' = hasFuel ? 'FUEL' : 'PARTS';
+      const fuelType = hasFuel 
+        ? (fuelItem?.product.name || 'Fuel') 
+        : (cart.map(i => `${i.product.name} x${i.quantity}`).join(', ') || 'Vehicle Parts');
+      const litres = hasFuel ? (fuelItem ? fuelItem.quantity : 1) : 0;
+      const description = cart.map(i => `${i.product.name} x${i.quantity}`).join(', ');
 
-    // Call Supabase placeOrder
-    const supabaseRes = await placeSupabaseOrder({
-      customer_id: customerId,
-      fuel_type: fuelType,
-      litres: litres,
-      delivery_lat: deliveryLat,
-      delivery_lng: deliveryLng,
-      status: 'PENDING',
-      otp: otp,
-    });
+      const customerId = getCustomerIdFromPhone(user?.phone);
+      const deliveryLat = selectedLocation.lat ?? 17.4125;
+      const deliveryLng = selectedLocation.lng ?? 78.3364;
+      const otp = generateDeliveryOtp();
+      const paymentMethod = payment?.method === 'upi' ? 'UPI' : 'COD';
+      const gstAmount = Math.round((total - fee) * 0.18);
 
-    const newOrder: Order = {
-      id: supabaseRes.data.id || `ORD-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-      items: [...cart],
-      status: 'processing',
-      total,
-      deliveryFee: fee,
-      distance: dist,
-      deliveryAddress: address,
-      estimatedTime: 15,
-      createdAt: Date.now(),
-      customer_id: customerId,
-      fuel_type: fuelType,
-      litres: litres,
-      delivery_lat: deliveryLat,
-      delivery_lng: deliveryLng,
-      driver_lat: supabaseRes.data.driver_lat,
-      driver_lng: supabaseRes.data.driver_lng,
-      driver_speed_kmh: supabaseRes.data.driver_speed_kmh,
-      otp: otp,
-      supabase_status: 'PENDING',
-      synced_to_supabase: supabaseRes.cloudSynced,
-      payment: payment,
-    };
-    setActiveOrder(newOrder);
-    setCart([]);
-    setCurrentScreen('tracking');
+      // Call Supabase placeOrder to insert into public.orders
+      const supabaseRes = await placeSupabaseOrder({
+        service_type: serviceType,
+        status: 'PENDING',
+        handshake_otp: otp,
+        otp: otp,
+        payment_method: paymentMethod,
+        customer_location: `${deliveryLat}, ${deliveryLng}`,
+        address: address,
+        total_amount: total,
+        price: total,
+        delivery_fee: fee,
+        gst_amount: gstAmount,
+        customer_phone: user?.phone || '',
+        customer_id: customerId,
+        fuel_type: fuelType,
+        litres: litres,
+        description: description,
+        delivery_lat: deliveryLat,
+        delivery_lng: deliveryLng,
+      });
+
+      if (!supabaseRes.success) {
+        setServerErrorBanner(supabaseRes.error || 'Failed to insert order into public.orders');
+        return false;
+      }
+      setServerErrorBanner(null);
+
+      const newOrder: Order = {
+        id: supabaseRes.data.id,
+        service_type: serviceType,
+        items: [...cart],
+        status: 'processing',
+        total,
+        total_amount: total,
+        deliveryFee: fee,
+        distance: dist,
+        deliveryAddress: address,
+        address: address,
+        customer_location: `${deliveryLat}, ${deliveryLng}`,
+        estimatedTime: 15,
+        createdAt: Date.now(),
+        customer_id: customerId,
+        fuel_type: fuelType,
+        litres: litres,
+        description: description,
+        delivery_lat: deliveryLat,
+        delivery_lng: deliveryLng,
+        driver_lat: supabaseRes.data.driver_lat,
+        driver_lng: supabaseRes.data.driver_lng,
+        driver_speed_kmh: supabaseRes.data.driver_speed_kmh,
+        otp: otp,
+        handshake_otp: otp,
+        payment_status: 'UNPAID',
+        payment_method: paymentMethod,
+        supabase_status: 'PENDING',
+        synced_to_supabase: supabaseRes.cloudSynced,
+        payment: payment,
+      };
+      setActiveOrder(newOrder);
+      setCart([]);
+      setCurrentScreen('tracking');
+      return true;
+    } catch (err: any) {
+      console.error('Fetch error:', err, supabaseUrl);
+      setServerErrorBanner(err?.message || 'Failed to insert order into public.orders');
+      return false;
+    }
   };
+
+  const placeOrder = handleOrderSubmit;
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -276,11 +490,12 @@ export default function App() {
             onNavigate={setCurrentScreen} 
             userPhone={user?.phone || ''} 
             selectedLocation={selectedLocation} 
-            onLocationChange={setSelectedLocation} 
-            locations={HYDERABAD_LOCATIONS} 
+            onLocationChange={handleSelectLocation} 
+            locations={locationsList} 
             cartCount={cart.length}
             onRequestSOS={() => setIsSosModalOpen(true)}
             onOrderFuel={() => setCurrentScreen('fuel')}
+            onAddNewLocation={handleAddNewLocation}
           />
         );
       case 'fuel':
@@ -290,7 +505,7 @@ export default function App() {
             onBack={() => setCurrentScreen('home')} 
             onAddToCart={addToCart} 
             onGoToCheckout={() => setCurrentScreen('checkout')} 
-            onOrderFuelDirect={handleOrderFuelDirect}
+            onOrderFuelDirect={handleOrderFuelDirect} 
             location={selectedLocation} 
           />
         );
@@ -308,7 +523,7 @@ export default function App() {
           />
         );
       case 'checkout':
-        return <Checkout cart={cart} onBack={() => setCurrentScreen('home')} onPlaceOrder={placeOrder} location={selectedLocation} />;
+        return <Checkout cart={cart} onBack={() => setCurrentScreen('home')} onPlaceOrder={handleOrderSubmit} handleOrderSubmit={handleOrderSubmit} location={selectedLocation} />;
       case 'tracking':
         return <Tracking order={activeOrder} onBack={() => setCurrentScreen('home')} />;
       case 'settings':
@@ -316,9 +531,23 @@ export default function App() {
       case 'notifications':
         return <Notifications onBack={() => setCurrentScreen('home')} />;
       case 'orders':
-        return <OrderHistory onBack={() => setCurrentScreen('settings')} />;
+        return (
+          <OrderHistory 
+            onBack={() => setCurrentScreen('settings')} 
+            customerId={getCustomerIdFromPhone(user?.phone)} 
+          />
+        );
       case 'addresses':
-        return <SavedAddresses onBack={() => setCurrentScreen('settings')} locations={HYDERABAD_LOCATIONS} />;
+        return (
+          <SavedAddresses 
+            onBack={() => setCurrentScreen('settings')} 
+            locations={locationsList} 
+            selectedLocation={selectedLocation}
+            onSelectLocation={handleSelectLocation}
+            onAddLocation={handleAddNewLocation}
+            onDeleteLocation={handleDeleteLocation}
+          />
+        );
       case 'profile':
         return <PersonalInfo onBack={() => setCurrentScreen('settings')} userPhone={user?.phone || ''} />;
       case 'language':
@@ -332,63 +561,25 @@ export default function App() {
       case 'analytics':
         return <ServiceAnalytics onBack={() => setCurrentScreen('home')} onNavigate={setCurrentScreen} />;
       case 'appointment':
-        return <AppointmentBooking onBack={() => setCurrentScreen('home')} onBook={() => setCurrentScreen('appointment_tracking')} />;
-      case 'appointment_tracking':
-        return <RepairTracking onBack={() => setCurrentScreen('home')} />;
-      case 'supabase_orders':
         return (
-          <SupabaseOrders 
+          <AppointmentBooking 
             onBack={() => setCurrentScreen('home')} 
-            onTrackOrder={(record) => {
-              const convertedOrder: Order = {
-                id: record.id,
-                items: [
-                  {
-                    product: {
-                      id: 'fuel_stream',
-                      name: record.fuel_type,
-                      price: record.fuel_type.toLowerCase().includes('petrol') ? 105 : 92,
-                      unit: 'L',
-                      description: `${record.litres}L of ${record.fuel_type}`,
-                      image: 'https://images.unsplash.com/photo-1610492410313-094038a83a0a?auto=format&fit=crop&q=80&w=400',
-                      category: 'fuel',
-                    },
-                    quantity: record.litres,
-                  },
-                ],
-                status: record.status === 'DELIVERED' ? 'delivered' : record.status === 'DISPATCHED' ? 'dispatched' : 'processing',
-                total: record.litres * (record.fuel_type.toLowerCase().includes('petrol') ? 105 : 92),
-                deliveryFee: 49,
-                distance: 2.4,
-                deliveryAddress: 'DLF Cyber City, Gachibowli',
-                estimatedTime: 15,
-                createdAt: new Date(record.created_at).getTime(),
-                customer_id: record.customer_id,
-                fuel_type: record.fuel_type,
-                litres: record.litres,
-                delivery_lat: record.delivery_lat,
-                delivery_lng: record.delivery_lng,
-                driver_lat: record.driver_lat,
-                driver_lng: record.driver_lng,
-                driver_speed_kmh: record.driver_speed_kmh,
-                otp: record.otp,
-                supabase_status: record.status as any,
-                synced_to_supabase: record.source === 'supabase_cloud',
-              };
-              setActiveOrder(convertedOrder);
-              setCurrentScreen('tracking');
+            selectedLocation={selectedLocation}
+            userPhone={user?.phone || ''}
+            onBook={(newId) => {
+              setActiveRepairOrderId(newId);
+              setCurrentScreen('appointment_tracking');
             }}
           />
         );
-      case 'central_system':
+      case 'appointment_tracking':
         return (
-          <CentralSystem
-            onBack={() => setCurrentScreen('home')}
-            onNavigate={setCurrentScreen}
-            selectedLocation={selectedLocation}
-            userPhone={user?.phone || '+91 98765 43210'}
+          <RepairTracking 
+            orderId={activeRepairOrderId || undefined}
+            onBack={() => setCurrentScreen('home')} 
           />
         );
+
       default:
         return (
           <Home 
@@ -407,6 +598,23 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 overflow-x-hidden selection:bg-orange-100 selection:text-orange-900">
+      {/* Top Red Error Banner if Supabase Insert Fails or Not Configured */}
+      {serverErrorBanner && (
+        <div className="bg-red-600 text-white px-4 py-2.5 text-xs font-semibold flex items-center justify-between sticky top-0 z-50 shadow-md">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-amber-300" />
+            <span>{serverErrorBanner}</span>
+          </div>
+          <button 
+            onClick={() => setServerErrorBanner(null)}
+            className="p-1 hover:bg-red-700 rounded text-red-200 hover:text-white transition-colors"
+            title="Dismiss"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       <AnimatePresence mode="wait">
         <motion.div
           key={currentScreen}

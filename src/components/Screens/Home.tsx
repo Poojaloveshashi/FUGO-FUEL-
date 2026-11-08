@@ -25,6 +25,8 @@ import { useState, useEffect } from 'react';
 import CompanionSyncModal from '../Companion/CompanionSyncModal';
 import { companionSync } from '../../services/companionSync';
 
+import LocationPickerModal from './LocationPickerModal';
+
 interface HomeProps {
   onNavigate: (screen: Screen) => void;
   userPhone: string;
@@ -34,6 +36,7 @@ interface HomeProps {
   cartCount: number;
   onRequestSOS?: () => void;
   onOrderFuel?: () => void;
+  onAddNewLocation?: (loc: UserLocation) => void;
 }
 
 export default function Home({ 
@@ -43,9 +46,10 @@ export default function Home({
   locations, 
   cartCount,
   onRequestSOS,
-  onOrderFuel 
+  onOrderFuel,
+  onAddNewLocation
 }: HomeProps) {
-  const [showLocations, setShowLocations] = useState(false);
+  const [showLocationsModal, setShowLocationsModal] = useState(false);
   const [showCompanionModal, setShowCompanionModal] = useState(false);
   const [isCompanionConnected, setIsCompanionConnected] = useState(companionSync.isConnected());
 
@@ -99,63 +103,61 @@ export default function Home({
       </header>
 
       <div className="p-6 space-y-8">
-        {/* Location Selector */}
+        {/* Interactive Location Selector Button */}
         <section className="relative">
-          <div 
-            onClick={() => setShowLocations(!showLocations)}
-            className="bg-slate-900 text-white p-4 rounded-2xl flex items-center justify-between shadow-xl shadow-slate-200 cursor-pointer hover:bg-slate-800 transition-colors"
+          <button 
+            type="button"
+            onClick={() => setShowLocationsModal(true)}
+            className="w-full bg-slate-900 text-white p-4 rounded-2xl flex items-center justify-between shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all text-left group"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 bg-white/10 group-hover:bg-orange-500/20 rounded-xl flex items-center justify-center shrink-0 transition-colors">
                 <MapPin className="text-orange-400 w-5 h-5" />
               </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Delivering to</p>
-                <div className="flex items-center gap-1">
-                  <h3 className="font-semibold text-sm truncate max-w-[120px]">{selectedLocation.name}</h3>
-                  <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${showLocations ? 'rotate-180' : ''}`} />
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Delivering to</p>
+                  {selectedLocation.isLiveLocation && (
+                    <span className="text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.2 rounded font-mono font-bold">
+                      LIVE GPS
+                    </span>
+                  )}
+                  {selectedLocation.tag && (
+                    <span className="text-[9px] bg-white/10 text-slate-300 px-1.5 py-0.2 rounded font-mono font-bold">
+                      {selectedLocation.tag}
+                    </span>
+                  )}
                 </div>
+                <div className="flex items-center gap-1.5">
+                  <h3 className="font-semibold text-sm truncate max-w-[160px] text-white">
+                    {selectedLocation.houseNumber ? `${selectedLocation.houseNumber}, ` : ''}{selectedLocation.name}
+                  </h3>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0 group-hover:text-orange-400 transition-colors" />
+                </div>
+                <p className="text-[11px] text-slate-400 truncate max-w-[200px]">
+                  {selectedLocation.address}
+                </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] bg-white/10 px-2 py-1 rounded font-bold text-orange-400">{selectedLocation.city}</span>
-              <Navigation className="w-5 h-5 text-slate-400" />
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[10px] bg-white/10 px-2.5 py-1 rounded-lg font-bold text-orange-400">
+                {selectedLocation.city}
+              </span>
+              <Navigation className="w-4 h-4 text-slate-400 group-hover:text-orange-400 transition-colors" />
             </div>
-          </div>
+          </button>
 
-          {/* Location Dropdown */}
-          <AnimatePresence>
-            {showLocations && (
-              <motion.div 
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border border-slate-100 shadow-2xl z-20 overflow-hidden"
-              >
-                <div className="p-3 border-b border-slate-50 bg-slate-50">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-3">Saved Locations</p>
-                </div>
-                {locations.map((loc) => (
-                  <button
-                    key={loc.id}
-                    onClick={() => {
-                      onLocationChange(loc);
-                      setShowLocations(false);
-                    }}
-                    className={`w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors text-left ${selectedLocation.id === loc.id ? 'bg-orange-50' : ''}`}
-                  >
-                    <div>
-                      <h4 className={`font-bold text-sm ${selectedLocation.id === loc.id ? 'text-orange-600' : 'text-slate-800'}`}>{loc.name}</h4>
-                      <p className="text-xs text-slate-400">{loc.address}</p>
-                    </div>
-                    {selectedLocation.id === loc.id && (
-                      <div className="w-2 h-2 bg-orange-500 rounded-full" />
-                    )}
-                  </button>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* Location Picker Modal */}
+          <LocationPickerModal
+            isOpen={showLocationsModal}
+            onClose={() => setShowLocationsModal(false)}
+            selectedLocation={selectedLocation}
+            locations={locations}
+            onSelectLocation={(loc) => {
+              onLocationChange(loc);
+            }}
+            onAddNewLocation={onAddNewLocation}
+          />
         </section>
 
         {/* Live Rates Ticker Banner */}
@@ -263,79 +265,6 @@ export default function Home({
           </motion.button>
         </section>
 
-        {/* Central System Architecture Interactive Card (Matches User's Ecosystem Diagram) */}
-        <section
-          onClick={() => onNavigate('central_system')}
-          className="bg-[#12161c] text-white p-5 rounded-[2.5rem] border border-slate-800 shadow-xl cursor-pointer hover:border-indigo-500/60 transition-all group relative overflow-hidden"
-        >
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              <span className="text-[10px] font-black uppercase tracking-wider text-indigo-300 font-mono">
-                Ecosystem Architecture
-              </span>
-            </div>
-            <div className="flex items-center gap-1 text-[11px] font-bold text-indigo-400 group-hover:text-indigo-300 transition-colors">
-              <span>Inspect Live System</span>
-              <ArrowRightIcon className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-
-          {/* Interactive visual diagram widget */}
-          <div className="bg-[#181e26] p-4 rounded-3xl border border-slate-800/80 space-y-2.5">
-            {/* Top: 3 Apps */}
-            <div className="grid grid-cols-3 gap-2 text-center text-[10px] font-bold">
-              <div className="bg-[#0f4333] text-emerald-300 py-1.5 px-1 rounded-xl border border-emerald-700/50 truncate">
-                Fuel app
-              </div>
-              <div className="bg-[#0f4333] text-emerald-300 py-1.5 px-1 rounded-xl border border-emerald-700/50 truncate">
-                Repairs app
-              </div>
-              <div className="bg-[#0f4333] text-emerald-300 py-1.5 px-1 rounded-xl border border-emerald-700/50 truncate">
-                Service app
-              </div>
-            </div>
-
-            {/* Connecting Arrows */}
-            <div className="flex justify-around text-slate-500 text-[11px] leading-none py-0.5">
-              <span>↕</span>
-              <span>↕</span>
-              <span>↕</span>
-            </div>
-
-            {/* Middle: Central system */}
-            <div className="bg-[#3d3282] text-white py-2 px-3 rounded-2xl text-center border border-indigo-400/40 shadow-sm">
-              <span className="text-xs font-black block">Central system</span>
-              <span className="text-[10px] text-indigo-200 block">Same users, orders, payments, stock</span>
-            </div>
-
-            {/* Connecting Arrow */}
-            <div className="text-center text-slate-500 text-[11px] leading-none py-0.5">
-              <span>↕</span>
-            </div>
-
-            {/* Bottom: Fulfilment */}
-            <div className="border border-dashed border-slate-700/90 rounded-2xl p-2 bg-black/20">
-              <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400 block mb-1">
-                Fulfilment
-              </span>
-              <div className="grid grid-cols-2 gap-1.5 text-[10px]">
-                <div className="bg-slate-800/80 py-1 px-2 rounded-lg text-slate-200">
-                  <strong>Delivery</strong>: Fuel drop-offs
-                </div>
-                <div className="bg-slate-800/80 py-1 px-2 rounded-lg text-slate-200">
-                  <strong>Mechanics</strong>: Repairs + service
-                </div>
-                <div className="bg-slate-800/80 py-1 px-2 rounded-lg text-slate-200">
-                  <strong>Offline outlets</strong>: Pumps, garages
-                </div>
-                <div className="bg-slate-800/80 py-1 px-2 rounded-lg text-slate-200">
-                  <strong>Warehouse</strong>: Fuel + parts stock
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
 
         {/* Dashboard Widgets */}
         <div className="grid grid-cols-1 gap-4">
@@ -417,26 +346,7 @@ export default function Home({
             </div>
           </section>
 
-          <section 
-            onClick={() => onNavigate('supabase_orders')}
-            className="bg-emerald-950 text-white p-6 rounded-[2.5rem] border border-emerald-800/80 shadow-lg flex items-center justify-between cursor-pointer hover:bg-emerald-900 transition-colors group"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-emerald-500/20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform border border-emerald-500/30">
-                 <Database className="w-6 h-6 text-emerald-400" />
-              </div>
-              <div>
-                 <div className="flex items-center gap-2">
-                   <h3 className="text-sm font-bold text-white">Supabase Orders</h3>
-                   <span className="text-[9px] bg-emerald-500 text-black font-black px-1.5 py-0.5 rounded uppercase">Live Table</span>
-                 </div>
-                 <p className="text-[10px] text-emerald-300/80 font-mono tracking-tight mt-0.5">placeOrder() • Lat: 17.4125, Lng: 78.3364</p>
-              </div>
-            </div>
-            <div className="bg-white/10 p-2 rounded-xl group-hover:bg-white/20 transition-colors">
-               <ArrowRightIcon className="w-4 h-4 text-emerald-300 group-hover:text-white" />
-            </div>
-          </section>
+
         </div>
 
         {/* Categories Grid */}

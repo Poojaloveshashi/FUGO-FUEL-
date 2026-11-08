@@ -16,20 +16,19 @@ import {
   Navigation2, 
   Gauge, 
   Terminal, 
-  Play, 
-  Pause, 
-  FastForward, 
   CheckCircle2,
   Share2,
   Receipt,
   CreditCard,
-  ExternalLink
+  ExternalLink,
+  XCircle,
+  AlertTriangle
 } from 'lucide-react';
 import { Order, StreamEventLog, SupabaseOrderRecord } from '../../types';
 import { 
   subscribeToOrderStream, 
-  updateOrderStatus, 
-  updateDriverLocation 
+  cancelPendingOrder,
+  fetchMyOtp 
 } from '../../services/supabase';
 import { companionSync, COMPANION_APP_URL, COMPANION_APP_ID } from '../../services/companionSync';
 import PaymentReceiptModal from '../Payment/PaymentReceiptModal';
@@ -58,17 +57,36 @@ export default function Tracking({ order, onBack }: TrackingProps) {
   const [streamOrder, setStreamOrder] = useState<SupabaseOrderRecord | null>(null);
   const [status, setStatus] = useState<'pending' | 'processing' | 'dispatched' | 'nearby' | 'delivered'>('pending');
   const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [liveOtp, setLiveOtp] = useState<string>(order?.otp || order?.handshake_otp || '');
+
+  // If local OTP is missing, call fugo_get_my_otp RPC
+  useEffect(() => {
+    let active = true;
+    if (order && !order.otp && !liveOtp) {
+      fetchMyOtp(order.id, order.customer_id || '').then((otp) => {
+        if (active && otp) setLiveOtp(otp);
+      });
+    }
+    return () => {
+      active = false;
+    };
+  }, [order?.id, order?.customer_id]);
   
-  // Realtime GPS telemetry
+  // Realtime GPS telemetry: null until real driver position arrives from Supabase
   const destLat = order?.delivery_lat ?? 17.4125;
   const destLng = order?.delivery_lng ?? 78.3364;
-  const [driverLat, setDriverLat] = useState<number>(destLat + 0.0165);
-  const [driverLng, setDriverLng] = useState<number>(destLng + 0.0142);
-  const [driverSpeed, setDriverSpeed] = useState<number>(38);
+  const [driverLat, setDriverLat] = useState<number | null>(
+    order?.driver_lat !== undefined && order?.driver_lat !== null ? Number(order.driver_lat) : null
+  );
+  const [driverLng, setDriverLng] = useState<number | null>(
+    order?.driver_lng !== undefined && order?.driver_lng !== null ? Number(order.driver_lng) : null
+  );
+  const [driverSpeed, setDriverSpeed] = useState<number | null>(
+    order?.driver_speed_kmh !== undefined && order?.driver_speed_kmh !== null ? Number(order.driver_speed_kmh) : null
+  );
   const [streamLogs, setStreamLogs] = useState<StreamEventLog[]>([]);
   const [showLogs, setShowLogs] = useState(false);
-  const [simSpeed, setSimSpeed] = useState<number>(1);
-  const [isSimPaused, setIsSimPaused] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [isCompanionModalOpen, setIsCompanionModalOpen] = useState(false);
   const [isCompanionConnected, setIsCompanionConnected] = useState(companionSync.isConnected());
@@ -98,12 +116,12 @@ export default function Tracking({ order, onBack }: TrackingProps) {
           setDriverSpeed(updatedRecord.driver_speed_kmh);
         }
 
-        // Map Supabase status to UI status
-        if (updatedRecord.status === 'DELIVERED') {
+        // Map Supabase status to UI status: IN_TRANSIT -> dispatched, COMPLETED -> delivered
+        const normStatus = (updatedRecord.status || '').toUpperCase();
+        if (normStatus === 'DELIVERED' || normStatus === 'COMPLETED') {
           setStatus('delivered');
           setTimeLeft(0);
-        } else if (updatedRecord.status === 'DISPATCHED') {
-          // Check proximity
+        } else if (normStatus === 'DISPATCHED' || normStatus === 'IN_TRANSIT') {
           const dist = calculateDistanceMeters(
             updatedRecord.driver_lat || destLat,
             updatedRecord.driver_lng || destLng,
@@ -115,7 +133,7 @@ export default function Tracking({ order, onBack }: TrackingProps) {
           } else {
             setStatus('dispatched');
           }
-        } else if (updatedRecord.status === 'PENDING') {
+        } else if (normStatus === 'PENDING') {
           setStatus('pending');
         } else {
           setStatus('processing');
@@ -124,17 +142,13 @@ export default function Tracking({ order, onBack }: TrackingProps) {
         if (event) {
           setStreamLogs(prev => [event, ...prev.slice(0, 19)]);
         }
-      },
-      {
-        simulateProgress: !isSimPaused,
-        speedMultiplier: simSpeed,
       }
     );
 
     return () => {
       unsubscribe();
     };
-  }, [order?.id, isSimPaused, simSpeed, destLat, destLng]);
+  }, [order?.id, destLat, destLng]);
 
   // Countdown timer
   useEffect(() => {
@@ -150,9 +164,10 @@ export default function Tracking({ order, onBack }: TrackingProps) {
   const currentProduct = order.items[0]?.product;
   const StatusIcon = currentProduct?.category === 'fuel' ? Fuel : currentProduct?.category === 'parts' ? Box : Wrench;
 
-  const distanceMeters = calculateDistanceMeters(driverLat, driverLng, destLat, destLng);
+  const hasDriverGps = driverLat !== null && driverLng !== null;
+  const distanceMeters = hasDriverGps ? calculateDistanceMeters(driverLat!, driverLng!, destLat, destLng) : null;
   const initialDist = 2400; // ~2.4 km initial
-  const progressRatio = Math.max(0, Math.min(1, 1 - distanceMeters / initialDist));
+  const progressRatio = distanceMeters !== null ? Math.max(0, Math.min(1, 1 - distanceMeters / initialDist)) : 0;
 
   // Compute map marker pixel coordinates along an aesthetic curved SVG track
   const svgWidth = 360;
@@ -167,19 +182,20 @@ export default function Tracking({ order, onBack }: TrackingProps) {
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
 
-  const handleSimulateArrived = () => {
-    updateDriverLocation(order.id, destLat, destLng, 0);
-    updateOrderStatus(order.id, 'DELIVERED');
-  };
-
-  const handleTogglePause = () => {
-    setIsSimPaused(prev => !prev);
-  };
-
-  const cycleSpeed = () => {
-    if (simSpeed === 1) setSimSpeed(2);
-    else if (simSpeed === 2) setSimSpeed(4);
-    else setSimSpeed(1);
+  const handleCancelOrder = async () => {
+    if (!order) return;
+    setIsCancelling(true);
+    try {
+      await cancelPendingOrder(order.id);
+      setActionNotice('Order cancelled successfully.');
+      setTimeout(() => {
+        onBack();
+      }, 1500);
+    } catch (e) {
+      setActionNotice('Failed to cancel order.');
+    } finally {
+      setIsCancelling(false);
+    }
   };
 
   return (
@@ -208,21 +224,6 @@ export default function Tracking({ order, onBack }: TrackingProps) {
           </div>
 
           <div className="flex items-center gap-1.5">
-            <button
-              onClick={cycleSpeed}
-              title="Simulation speed"
-              className="bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-xl border border-white/10 text-[10px] font-mono text-orange-400 font-bold hover:bg-black/80 flex items-center gap-1"
-            >
-              <FastForward className="w-3 h-3" />
-              {simSpeed}x
-            </button>
-            <button
-              onClick={handleTogglePause}
-              title={isSimPaused ? "Resume Stream" : "Pause Stream"}
-              className="bg-black/60 backdrop-blur-md p-1.5 rounded-xl border border-white/10 text-white hover:bg-black/80"
-            >
-              {isSimPaused ? <Play className="w-3.5 h-3.5 text-emerald-400" /> : <Pause className="w-3.5 h-3.5 text-amber-400" />}
-            </button>
             <button
               onClick={() => setIsCompanionModalOpen(true)}
               title="Open Companion Driver App (4d28260b) Bridge"
@@ -290,40 +291,66 @@ export default function Tracking({ order, onBack }: TrackingProps) {
           </text>
         </svg>
 
-        {/* Real-time Moving Driver Truck/Agent Marker */}
-        <motion.div
-          animate={{ x: currentX - 20, y: currentY - 20 }}
-          transition={{ type: 'spring', damping: 20, stiffness: 80 }}
-          className="absolute top-0 left-0 z-20 pointer-events-none"
-        >
-          <div className="relative">
-            <div className="w-10 h-10 bg-orange-500 rounded-2xl shadow-xl shadow-orange-500/40 border-2 border-white flex items-center justify-center">
-              <Navigation2 
-                className="w-5 h-5 text-white transform rotate-45 transition-transform duration-300" 
-              />
+        {/* Real-time Moving Driver Truck/Agent Marker (only when driver position arrives) */}
+        {hasDriverGps ? (
+          <motion.div
+            animate={{ x: currentX - 20, y: currentY - 20 }}
+            transition={{ type: 'spring', damping: 20, stiffness: 80 }}
+            className="absolute top-0 left-0 z-20 pointer-events-none"
+          >
+            <div className="relative">
+              <div className="w-10 h-10 bg-orange-500 rounded-2xl shadow-xl shadow-orange-500/40 border-2 border-white flex items-center justify-center">
+                <Navigation2 
+                  className="w-5 h-5 text-white transform rotate-45 transition-transform duration-300" 
+                />
+              </div>
+              {/* Speed bubble */}
+              <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white font-mono text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-white/20 whitespace-nowrap shadow">
+                {driverSpeed !== null ? `${driverSpeed} km/h` : 'En Route'}
+              </div>
             </div>
-            {/* Speed bubble */}
-            <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white font-mono text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-white/20 whitespace-nowrap shadow">
-              {driverSpeed} km/h
+          </motion.div>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+            <div className="bg-black/70 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 flex items-center gap-2.5 shadow-xl">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+              </span>
+              <span className="text-xs font-bold text-amber-300 font-mono tracking-wide">
+                Waiting for a driver
+              </span>
             </div>
           </div>
-        </motion.div>
+        )}
 
         {/* Live GPS Telemetry Floating HUD */}
         <div className="absolute bottom-3 left-4 right-4 z-20 bg-slate-950/85 backdrop-blur-md rounded-2xl p-3 border border-white/10 text-white flex items-center justify-between text-xs">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-orange-500/20 text-orange-400 border border-orange-500/30 flex items-center justify-center">
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center border ${
+              hasDriverGps 
+                ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' 
+                : 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+            }`}>
               <Radio className="w-4 h-4 animate-pulse" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] text-slate-400 uppercase font-black tracking-wider">Driver GPS Stream</span>
-                <span className="font-mono text-[10px] text-emerald-400 font-bold">
-                  {distanceMeters <= 50 ? 'ARRIVED' : `${distanceMeters}m away`}
-                </span>
+                {hasDriverGps ? (
+                  <span className="font-mono text-[10px] text-emerald-400 font-bold">
+                    {distanceMeters !== null && distanceMeters <= 50 ? 'ARRIVED' : `${distanceMeters}m away`}
+                  </span>
+                ) : (
+                  <span className="font-mono text-[10px] text-amber-400 font-bold animate-pulse">
+                    Waiting for a driver
+                  </span>
+                )}
               </div>
               <div className="font-mono text-[11px] text-slate-200">
-                Lat: {driverLat.toFixed(4)} • Lng: {driverLng.toFixed(4)}
+                {hasDriverGps 
+                  ? `Lat: ${driverLat!.toFixed(4)} • Lng: ${driverLng!.toFixed(4)}`
+                  : 'Searching for nearest partner bowser...'}
               </div>
             </div>
           </div>
@@ -418,7 +445,7 @@ export default function Tracking({ order, onBack }: TrackingProps) {
           </div>
           <div className="bg-white/20 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/20 text-center">
             <span className="font-mono text-2xl font-black tracking-[0.25em] pl-1">
-              {order.otp || '4821'}
+              {liveOtp || order.otp || '----'}
             </span>
           </div>
         </section>
@@ -446,11 +473,15 @@ export default function Tracking({ order, onBack }: TrackingProps) {
             <div className="col-span-2 flex flex-col gap-1 text-slate-400 text-[11px] font-mono pt-1 border-t border-white/5">
               <div className="flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>Dest: Lat {destLat.toFixed(4)}, Lng {destLng.toFixed(4)}</span>
+                <span>Dest: Lat {(destLat ?? 17.4125).toFixed(4)}, Lng {(destLng ?? 78.3364).toFixed(4)}</span>
               </div>
               <div className="flex items-center gap-1.5 text-orange-300">
                 <Navigation2 className="w-3.5 h-3.5 text-orange-400 shrink-0" />
-                <span>Live Driver: Lat {driverLat.toFixed(4)}, Lng {driverLng.toFixed(4)} ({driverSpeed} km/h)</span>
+                <span>
+                  {hasDriverGps 
+                    ? `Live Driver: Lat ${driverLat?.toFixed(4)}, Lng ${driverLng?.toFixed(4)} (${driverSpeed ?? 0} km/h)` 
+                    : 'Live Driver: Waiting for a driver...'}
+                </span>
               </div>
             </div>
           </div>
@@ -486,16 +517,20 @@ export default function Tracking({ order, onBack }: TrackingProps) {
           </section>
         )}
 
-        {/* Quick Simulation Controls */}
-        {status !== 'delivered' && (
-          <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-2xl">
-            <span className="text-xs font-medium text-slate-600">Simulate rapid arrival:</span>
+        {/* Cancel Pending Order Control (only allowed status write from customer app) */}
+        {(status === 'pending' || order.supabase_status === 'PENDING') && status !== 'delivered' && (
+          <div className="flex items-center justify-between p-3.5 bg-red-50/80 border border-red-100 rounded-2xl">
+            <div>
+              <span className="text-xs font-bold text-red-900 block leading-tight">Searching for nearest partner...</span>
+              <span className="text-[10px] text-red-600">You can cancel free of charge while pending</span>
+            </div>
             <button
-              onClick={handleSimulateArrived}
-              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all active:scale-95 flex items-center gap-1.5"
+              onClick={handleCancelOrder}
+              disabled={isCancelling}
+              className="px-3.5 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all active:scale-95 flex items-center gap-1.5 shadow-sm"
             >
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              Mark Delivered
+              <XCircle className="w-3.5 h-3.5" />
+              <span>{isCancelling ? 'Cancelling...' : 'Cancel Order'}</span>
             </button>
           </div>
         )}

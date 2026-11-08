@@ -1,9 +1,9 @@
 import QRCode from 'qrcode';
 import { PaymentTransactionInfo, PaymentMethodCategory } from '../types';
+import { fetchAppSettings, AppSettings } from './supabase';
 
-export const FUGO_MERCHANT_VPA = 'fugo.energy@icicibank';
-export const FUGO_MERCHANT_NAME = 'Fugo Fuel Express';
-export const FUGO_GSTIN = '36AABCF9821L1ZT';
+export { fetchAppSettings };
+export type { AppSettings };
 
 export interface CardDetails {
   number: string;
@@ -66,11 +66,11 @@ export const UPI_APPS = [
 ];
 
 export const WALLET_PROVIDERS = [
-  { id: 'fugo', name: 'Fugo Fuel Balance', subtitle: 'Instant 1-Click Fuel Dispense', isDefault: true },
-  { id: 'paytm', name: 'Paytm Wallet', subtitle: 'Linked with OTP' },
-  { id: 'amazon', name: 'Amazon Pay Balance', subtitle: 'Fast 1-tap checkout' },
-  { id: 'phonepe', name: 'PhonePe Wallet', subtitle: 'Instant cashback eligible' },
-  { id: 'mobikwik', name: 'MobiKwik Fuel Wallet', subtitle: 'SuperCash auto-applied' },
+  { id: 'fugo', name: 'Fugo Fuel Balance', subtitle: 'Coming Soon', isDefault: true },
+  { id: 'paytm', name: 'Paytm Wallet', subtitle: 'Coming Soon' },
+  { id: 'amazon', name: 'Amazon Pay Balance', subtitle: 'Coming Soon' },
+  { id: 'phonepe', name: 'PhonePe Wallet', subtitle: 'Coming Soon' },
+  { id: 'mobikwik', name: 'MobiKwik Fuel Wallet', subtitle: 'Coming Soon' },
 ];
 
 export const FLEET_CARD_PROVIDERS: FleetCardDetails['provider'][] = [
@@ -155,30 +155,34 @@ export function generateTransactionId(): string {
   return `TXN_${dateStr}_${rand}`;
 }
 
-export function generateRRN(): string {
-  return `RRN_${Math.floor(100000000000 + Math.random() * 900000000000)}`;
-}
-
-export function generateAuthCode(): string {
-  return `AUTH_${Math.floor(100000 + Math.random() * 900000)}`;
-}
-
 export function generateInvoiceNumber(): string {
   const year = new Date().getFullYear();
   const num = Math.floor(10000 + Math.random() * 90000);
   return `INV-${year}-${num}`;
 }
 
-export function buildUpiPayloadUrl(amount: number, txnId: string, customVpa?: string): string {
-  const pa = customVpa || FUGO_MERCHANT_VPA;
-  const pn = encodeURIComponent(FUGO_MERCHANT_NAME);
+export function buildUpiPayloadUrl(
+  amount: number, 
+  txnId: string, 
+  merchantVpa: string, 
+  merchantName: string = 'Fugo'
+): string {
+  if (!merchantVpa) return '';
+  const pa = merchantVpa;
+  const pn = encodeURIComponent(merchantName || 'Fugo');
   const am = amount.toFixed(2);
   const tn = encodeURIComponent(`FugoFuel_${txnId}`);
   return `upi://pay?pa=${pa}&pn=${pn}&am=${am}&cu=INR&tn=${tn}&tr=${txnId}`;
 }
 
-export async function generateUpiQrDataUrl(amount: number, txnId: string): Promise<string> {
-  const upiUrl = buildUpiPayloadUrl(amount, txnId);
+export async function generateUpiQrDataUrl(
+  amount: number, 
+  txnId: string, 
+  merchantVpa: string, 
+  merchantName: string = 'Fugo'
+): Promise<string> {
+  const upiUrl = buildUpiPayloadUrl(amount, txnId, merchantVpa, merchantName);
+  if (!upiUrl) return '';
   try {
     return await QRCode.toDataURL(upiUrl, {
       margin: 1,
@@ -193,29 +197,6 @@ export async function generateUpiQrDataUrl(amount: number, txnId: string): Promi
     console.error('Failed to generate QR code', e);
     return '';
   }
-}
-
-const WALLET_KEY = 'fugo_wallet_balance';
-const DEFAULT_WALLET_BALANCE = 5000;
-
-export function getWalletBalance(): number {
-  if (typeof localStorage === 'undefined') return DEFAULT_WALLET_BALANCE;
-  const val = localStorage.getItem(WALLET_KEY);
-  if (!val) {
-    localStorage.setItem(WALLET_KEY, DEFAULT_WALLET_BALANCE.toString());
-    return DEFAULT_WALLET_BALANCE;
-  }
-  const parsed = parseFloat(val);
-  return isNaN(parsed) ? DEFAULT_WALLET_BALANCE : parsed;
-}
-
-export function updateWalletBalance(delta: number): number {
-  const current = getWalletBalance();
-  const next = Math.max(0, current + delta);
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(WALLET_KEY, next.toFixed(2));
-  }
-  return next;
 }
 
 export function createPaymentRecord(params: {
@@ -239,20 +220,18 @@ export function createPaymentRecord(params: {
   changeRequiredFor?: number;
 }): PaymentTransactionInfo {
   const txnId = generateTransactionId();
-  const gstAmount = Math.round(params.subtotal * 0.18); // 18% GST (CGST 9% + SGST 9%)
+  const gstAmount = Math.round(params.subtotal * 0.18);
   
   return {
     method: params.method,
     methodTitle: params.methodTitle,
     transactionId: txnId,
-    rrn: generateRRN(),
-    authCode: generateAuthCode(),
     paidAt: new Date().toLocaleString('en-IN', {
       timeZone: 'Asia/Kolkata',
       dateStyle: 'medium',
       timeStyle: 'short',
     }),
-    status: params.method === 'pod' ? 'PENDING_ON_DELIVERY' : 'PAID',
+    status: 'PAY_ON_DELIVERY',
     amount: params.amount,
     subtotal: params.subtotal,
     deliveryFee: params.deliveryFee,
