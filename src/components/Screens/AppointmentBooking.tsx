@@ -68,7 +68,8 @@ export default function AppointmentBooking({
     setIsSubmitting(false);
 
     if (!res.success) {
-      const errorMsg = res.error || 'Failed to insert order into public.orders';
+      console.error('Appointment booking error:', res.error);
+      const errorMsg = 'Something went wrong. Please try again.';
       setBookingError(errorMsg);
       if (onError) onError(errorMsg);
       return;
@@ -179,9 +180,28 @@ export default function AppointmentBooking({
               <p className="text-xs text-slate-500">{selectedLocation.address}, {selectedLocation.city}</p>
             </div>
           </div>
-          <div className="text-slate-400 p-2">
-            <ArrowRight className="w-5 h-5" />
+        </section>
+
+        {/* Transparent Service Pricing Card with MRP */}
+        <section className="bg-white p-5 rounded-[2.2rem] border border-slate-100 shadow-sm space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Doorstep Visit & Inspection Tariff</span>
+            <span className="text-[9px] bg-emerald-100 text-emerald-800 font-black px-2 py-0.5 rounded-full uppercase">
+              Save ₹300
+            </span>
           </div>
+          <div className="flex items-baseline justify-between">
+            <div>
+              <span className="text-2xl font-black text-slate-900 tracking-tight">₹199</span>
+              <span className="text-xs text-slate-400 ml-2">Inspection & Diagnosis</span>
+            </div>
+            <div className="text-right">
+              <span className="text-xs text-slate-400">MRP: <span className="line-through">₹499</span></span>
+            </div>
+          </div>
+          <p className="text-[11px] text-emerald-700 bg-emerald-50/80 p-2.5 rounded-xl border border-emerald-100 font-medium">
+            💡 <strong>100% Rebate:</strong> Inspection fee is adjusted and waived if you approve any on-spot repair or parts replacement! Pay on delivery via Cash or UPI.
+          </p>
         </section>
 
         {/* Trust Badge */}
@@ -210,7 +230,7 @@ export default function AppointmentBooking({
           }`}
         >
           {isSubmitting ? (
-            <span>Sending to Supabase...</span>
+            <span>Confirming Appointment...</span>
           ) : (
             <span>Book Appointment Now</span>
           )}

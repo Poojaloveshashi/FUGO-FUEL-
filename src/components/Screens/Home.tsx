@@ -24,6 +24,7 @@ import { Screen, UserLocation } from '../../types';
 import { useState, useEffect } from 'react';
 import CompanionSyncModal from '../Companion/CompanionSyncModal';
 import { companionSync } from '../../services/companionSync';
+import { FUEL_SALES_ENABLED, FUEL_COMING_SOON_MESSAGE } from '../../config/fuelConfig';
 
 import LocationPickerModal from './LocationPickerModal';
 
@@ -51,6 +52,7 @@ export default function Home({
 }: HomeProps) {
   const [showLocationsModal, setShowLocationsModal] = useState(false);
   const [showCompanionModal, setShowCompanionModal] = useState(false);
+  const [showFuelComingSoonSheet, setShowFuelComingSoonSheet] = useState(false);
   const [isCompanionConnected, setIsCompanionConnected] = useState(companionSync.isConnected());
 
   useEffect(() => {
@@ -61,9 +63,18 @@ export default function Home({
   }, []);
 
   const categories = [
-    { id: 'fuel', icon: Fuel, label: 'Fuel Up', color: 'bg-orange-500', desc: 'Petrol/Diesel' },
-    { id: 'parts', icon: ShoppingBag, label: 'Spare Parts', color: 'bg-slate-900', desc: '64 Verified Items • Rates from ₹120' },
-    { id: 'services', icon: Wrench, label: 'Service', color: 'bg-blue-600', desc: 'Puncture/Jump' },
+    { id: 'appointment', icon: Calendar, label: 'Doorstep Repair & Mechanic', color: 'bg-indigo-600', desc: 'Expert Diagnosis • Arrival < 15m' },
+    { id: 'services', icon: Wrench, label: 'Roadside Services', color: 'bg-blue-600', desc: 'Battery, Jumpstart, Puncture • Live Tariffs' },
+    { id: 'parts', icon: ShoppingBag, label: 'Spare Parts Store', color: 'bg-slate-900', desc: '64 OEM Parts • Verified MRP & Discounts' },
+    { 
+      id: 'fuel', 
+      icon: Fuel, 
+      label: 'Fuel Up', 
+      color: 'bg-slate-400', 
+      desc: 'Mobile Bowser Delivery',
+      isComingSoon: true,
+      onClick: () => setShowFuelComingSoonSheet(true)
+    },
   ];
 
   return (
@@ -71,10 +82,10 @@ export default function Home({
       {/* Header */}
       <header className="p-6 bg-white border-b border-slate-100 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
-            <Fuel className="text-white w-5 h-5" />
+          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
+            <Wrench className="text-white w-5 h-5" />
           </div>
-          <span className="font-bold text-lg tracking-tight">Fugo Fuel</span>
+          <span className="font-bold text-lg tracking-tight">Fugo Auto & Repair</span>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -199,46 +210,50 @@ export default function Home({
           </div>
         </section>
 
-        {/* Promo Banner */}
+        {/* Built-in Station Card (soft gradient background and map-pin icon) */}
         <motion.section 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative h-44 rounded-3xl overflow-hidden shadow-lg shadow-orange-100 group"
+          className="relative h-44 rounded-3xl overflow-hidden shadow-lg shadow-orange-500/10 bg-gradient-to-br from-slate-900 via-indigo-950 to-orange-950 p-6 flex flex-col justify-between border border-orange-500/20"
         >
-          <img 
-            src="https://images.unsplash.com/photo-1545644161-591605335805?auto=format&fit=crop&q=80&w=800" 
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
-            alt="Fugo Express Station"
-            referrerPolicy="no-referrer"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-orange-600/90 via-orange-600/20 to-transparent p-6 flex flex-col justify-end">
-            <h2 className="text-white text-2xl font-bold leading-tight line-clamp-2">Fugo Express: {selectedLocation.city} Station</h2>
-            <p className="text-white/80 text-sm mt-1">15-Minute delivery guaranteed from nearest station</p>
+          <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+          <div className="flex items-center justify-between relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center text-orange-400">
+              <MapPin className="w-6 h-6" />
+            </div>
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider bg-white/10 px-3 py-1 rounded-full text-orange-200 border border-white/10">
+              15-Min Delivery Hub
+            </span>
+          </div>
+          <div className="relative z-10">
+            <h2 className="text-white text-xl sm:text-2xl font-bold leading-tight">
+              Fugo Express: {selectedLocation.city} Station
+            </h2>
+            <p className="text-orange-200/80 text-xs sm:text-sm mt-1">
+              Guaranteed doorstep service from your nearest authorized hub
+            </p>
           </div>
         </motion.section>
 
-        {/* Core Direct Action Triggers: Order Fuel & Request SOS */}
+        {/* Core Direct Action Triggers: Repair Booking & Breakdown Rescue */}
         <section className="grid grid-cols-2 gap-3.5">
           <motion.button
             whileTap={{ scale: 0.97 }}
-            onClick={() => {
-              if (onOrderFuel) onOrderFuel();
-              else onNavigate('fuel');
-            }}
-            className="bg-gradient-to-br from-orange-500 to-amber-600 text-white p-4 rounded-3xl shadow-lg shadow-orange-500/20 text-left flex flex-col justify-between group border border-orange-400/40 relative overflow-hidden"
+            onClick={() => onNavigate('appointment')}
+            className="bg-gradient-to-br from-indigo-700 via-indigo-800 to-slate-900 text-white p-4 rounded-3xl shadow-lg shadow-indigo-600/20 text-left flex flex-col justify-between group border border-indigo-500/40 relative overflow-hidden"
           >
             <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-8 -mt-8 pointer-events-none" />
             <div className="flex items-center justify-between mb-3">
               <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center">
-                <Fuel className="w-5 h-5 text-white" />
+                <Wrench className="w-5 h-5 text-white" />
               </div>
-              <span className="text-[9px] bg-black/20 text-white font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
-                15m Express
+              <span className="text-[9px] bg-emerald-400 text-slate-950 font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                Active Now
               </span>
             </div>
             <div>
-              <h3 className="font-black text-base leading-tight">Order Fuel</h3>
-              <p className="text-[11px] text-white/80 mt-0.5">Petrol & Diesel Dispatch</p>
+              <h3 className="font-black text-base leading-tight">Book Repair</h3>
+              <p className="text-[11px] text-indigo-200 mt-0.5">Doorstep Mechanic & Service</p>
             </div>
           </motion.button>
 
@@ -263,6 +278,39 @@ export default function Home({
               <p className="text-[11px] text-white/80 mt-0.5">Instant Breakdown Rescue</p>
             </div>
           </motion.button>
+        </section>
+
+        {/* "Order Fuel" Card (Greyed out with orange Coming soon badge, tapping opens Coming soon sheet) */}
+        <section 
+          onClick={() => setShowFuelComingSoonSheet(true)}
+          className="bg-slate-100/90 border border-slate-200/90 rounded-3xl p-5 relative overflow-hidden opacity-80 hover:opacity-100 transition-all cursor-pointer shadow-xs"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-slate-200 text-slate-500 flex items-center justify-center">
+                <Fuel className="w-5 h-5 text-slate-500" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-700 leading-tight">Order Fuel</h3>
+                <p className="text-[10px] text-slate-400">Mobile Bowser Doorstep Refuelling</p>
+              </div>
+            </div>
+            <span className="text-[10px] font-black uppercase tracking-wider bg-orange-500 text-white px-2.5 py-0.5 rounded-full shadow-xs">
+              Coming Soon
+            </span>
+          </div>
+
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Doorstep fuel dispensing is under safety regulation rollout. Tap to view status.
+          </p>
+
+          <div className="mt-3 pt-3 border-t border-slate-200/60 flex items-center justify-between text-slate-400 text-xs">
+            <span className="text-[11px] font-mono">Diesel & Petrol Refuelling</span>
+            <span className="text-orange-600 font-bold text-xs flex items-center gap-1">
+              <span>Learn More</span>
+              <ArrowRightIcon className="w-3 h-3" />
+            </span>
+          </div>
         </section>
 
 
@@ -352,26 +400,48 @@ export default function Home({
         {/* Categories Grid */}
         <section>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-bold text-lg">Services</h2>
-            <button className="text-orange-500 text-sm font-semibold">View All</button>
+            <div>
+              <h2 className="font-bold text-lg text-slate-900">Repair, Services & Parts</h2>
+              <p className="text-xs text-slate-400">Doorstep mechanic & authentic parts with transparent MRP</p>
+            </div>
+            <button onClick={() => onNavigate('parts')} className="text-orange-500 text-xs font-bold hover:underline">
+              View Catalog
+            </button>
           </div>
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 gap-3.5">
             {categories.map((cat, idx) => (
               <motion.button
                 key={cat.id}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => onNavigate(cat.id as Screen)}
-                className="flex items-center gap-4 bg-white p-4 rounded-2xl border border-slate-100 hover:border-orange-200 transition-all hover:shadow-md group shadow-sm shadow-slate-100"
+                onClick={() => {
+                  if ((cat as any).onClick) {
+                    (cat as any).onClick();
+                  } else {
+                    onNavigate(cat.id as Screen);
+                  }
+                }}
+                className={`flex items-center gap-4 bg-white p-4 rounded-2xl border transition-all hover:shadow-md group shadow-sm shadow-slate-100 ${
+                  (cat as any).isComingSoon 
+                    ? 'opacity-75 border-slate-200 hover:border-orange-300' 
+                    : 'border-slate-100 hover:border-indigo-200'
+                }`}
               >
                 <div className={`${cat.color} w-14 h-14 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}>
                   <cat.icon className="text-white w-7 h-7" />
                 </div>
                 <div className="text-left flex-1">
-                  <h3 className="font-bold text-slate-800">{cat.label}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-slate-800">{cat.label}</h3>
+                    {(cat as any).isComingSoon && (
+                      <span className="text-[9px] font-black uppercase tracking-wider bg-orange-500 text-white px-2 py-0.5 rounded-full">
+                        Coming Soon
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-slate-400">{cat.desc}</p>
                 </div>
-                <div className="bg-slate-50 w-8 h-8 rounded-full flex items-center justify-center group-hover:bg-orange-50 transition-colors">
-                  <ArrowRightIcon className="w-4 h-4 text-slate-300 group-hover:text-orange-500" />
+                <div className="bg-slate-50 w-8 h-8 rounded-full flex items-center justify-center group-hover:bg-indigo-50 transition-colors">
+                  <ArrowRightIcon className="w-4 h-4 text-slate-300 group-hover:text-indigo-600" />
                 </div>
               </motion.button>
             ))}
@@ -383,12 +453,63 @@ export default function Home({
       {/* Bottom Nav */}
       <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/80 backdrop-blur-lg border-t border-slate-100 px-8 py-3 flex justify-between items-center z-20">
         <NavButton icon={Navigation} active onClick={() => onNavigate('home')} />
-        <div className="bg-orange-500 w-12 h-12 rounded-full -mt-10 flex items-center justify-center shadow-xl shadow-orange-300 border-4 border-white active:scale-90 transition-transform cursor-pointer" onClick={() => onNavigate('fuel')}>
-          <Fuel className="text-white w-6 h-6" />
+        <div 
+          className="bg-indigo-600 w-12 h-12 rounded-full -mt-10 flex items-center justify-center shadow-xl shadow-indigo-300 border-4 border-white active:scale-90 transition-transform cursor-pointer" 
+          onClick={() => onNavigate('appointment')}
+          title="Book Doorstep Repair"
+        >
+          <Wrench className="text-white w-6 h-6" />
         </div>
         <NavButton icon={ShoppingBag} onClick={() => onNavigate('checkout')} badge={cartCount > 0 ? cartCount : undefined} />
         <NavButton icon={User} onClick={() => onNavigate('settings')} />
       </nav>
+
+      {/* Fuel Coming Soon Sheet */}
+      <AnimatePresence>
+        {showFuelComingSoonSheet && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4">
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className="bg-white w-full max-w-md rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl border border-slate-100 space-y-4"
+            >
+              <div className="w-12 h-1 bg-slate-200 rounded-full mx-auto" />
+              <div className="flex items-center gap-3 pt-2">
+                <div className="w-12 h-12 rounded-2xl bg-orange-100 flex items-center justify-center text-orange-600 shrink-0">
+                  <Fuel className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-900">Fuel Delivery</h3>
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-orange-500 text-white px-2 py-0.5 rounded-full">
+                      Coming Soon
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400">Licensing in Progress</p>
+                </div>
+              </div>
+
+              <div className="bg-amber-50/90 border border-amber-200/80 rounded-2xl p-4 text-xs text-amber-950 leading-relaxed font-medium">
+                {FUEL_COMING_SOON_MESSAGE}
+              </div>
+
+              <p className="text-xs text-slate-500">
+                In the meantime, our certified mechanics, emergency roadside assistance, flatbed towing, and authentic spare parts catalog are fully active.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => setShowFuelComingSoonSheet(false)}
+                className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-2xl transition-all"
+              >
+                Close
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Companion Driver App Sync Bridge Modal */}
       <CompanionSyncModal

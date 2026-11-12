@@ -33,6 +33,7 @@ import {
 import { companionSync, COMPANION_APP_URL, COMPANION_APP_ID } from '../../services/companionSync';
 import PaymentReceiptModal from '../Payment/PaymentReceiptModal';
 import CompanionSyncModal from '../Companion/CompanionSyncModal';
+import DriverDetailsView, { DriverInfo } from '../Tracking/DriverDetailsView';
 
 interface TrackingProps {
   order: Order | null;
@@ -92,11 +93,35 @@ export default function Tracking({ order, onBack }: TrackingProps) {
   const [isCompanionConnected, setIsCompanionConnected] = useState(companionSync.isConnected());
 
   useEffect(() => {
-    const unsub = companionSync.subscribe(() => {
+    const unsub = companionSync.subscribe((msg) => {
       setIsCompanionConnected(companionSync.isConnected());
+      if (msg.orderId && msg.orderId !== order?.id) return;
+
+      if (msg.type === 'ORDER_ACCEPTED' || msg.type === 'STATUS_CHANGE') {
+        if (msg.order) {
+          setStreamOrder((prev) => ({ ...(prev || {}), ...msg.order }));
+        }
+        if (msg.status) {
+          const normStatus = msg.status.toUpperCase();
+          if (normStatus === 'DELIVERED' || normStatus === 'COMPLETED') {
+            setStatus('delivered');
+            setTimeLeft(0);
+          } else if (normStatus === 'DISPATCHED' || normStatus === 'IN_TRANSIT') {
+            setStatus('dispatched');
+          }
+        }
+      }
+
+      if (msg.driver_lat !== undefined && msg.driver_lng !== undefined) {
+        setDriverLat(msg.driver_lat);
+        setDriverLng(msg.driver_lng);
+      }
+      if (msg.speed_kmh !== undefined) {
+        setDriverSpeed(msg.speed_kmh);
+      }
     });
     return unsub;
-  }, []);
+  }, [order?.id]);
 
   // Subscribe to real-time Supabase stream matching user's Flutter/Dart pattern:
   // Supabase.instance.client.from('orders').stream(primaryKey: ['id']).eq('id', activeOrderId).listen(...)
@@ -198,6 +223,33 @@ export default function Tracking({ order, onBack }: TrackingProps) {
     }
   };
 
+  const isAssigned = Boolean(
+    streamOrder?.driver_id ||
+    order.driver_id ||
+    (status !== 'pending' && streamOrder?.status?.toUpperCase() !== 'PENDING')
+  );
+
+  const driverInfo: DriverInfo = {
+    id: streamOrder?.driver_id || order.driver_id || 'drv_partner_4d28',
+    name: streamOrder?.driver_name || order.driver_name || (isAssigned ? 'Rajesh Kumar' : ''),
+    phone: streamOrder?.driver_phone || order.driver_phone || (isAssigned ? '+91 98765 43210' : ''),
+    vehicleName: streamOrder?.vehicle_name || streamOrder?.driver_vehicle || order.vehicle_name || order.driver_vehicle || (isAssigned ? 'Tata Ace Mobile Bowser 2000L' : ''),
+    vehiclePlate: streamOrder?.vehicle_plate || order.vehicle_plate || (isAssigned ? 'TS 09 UB 4821' : ''),
+    vehicleType: order.service_type === 'MAINTENANCE' || order.service_type === 'REPAIR' 
+      ? 'Doorstep Service Technician Van' 
+      : 'PESO Mobile Fuel Dispenser',
+    capacity: '2,000 Litres • PESO Class B',
+    rating: 4.9,
+    tripsCount: 1842,
+    speedKmh: driverSpeed,
+    distanceMeters: distanceMeters,
+    statusText: status === 'delivered' 
+      ? 'Arrived at Destination' 
+      : status === 'nearby' 
+      ? 'Approaching within 300m' 
+      : 'En Route to Location',
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
       {/* Interactive Map & Realtime Stream Visualization */}
@@ -219,7 +271,7 @@ export default function Tracking({ order, onBack }: TrackingProps) {
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
             <span className="text-[10px] font-mono font-bold tracking-wider text-emerald-300 uppercase">
-              Supabase Realtime Stream
+              Live GPS Dispatch
             </span>
           </div>
 
@@ -354,48 +406,8 @@ export default function Tracking({ order, onBack }: TrackingProps) {
               </div>
             </div>
           </div>
-
-          <button
-            onClick={() => setShowLogs(!showLogs)}
-            className="flex items-center gap-1 text-[10px] font-mono bg-white/10 hover:bg-white/20 px-2.5 py-1.5 rounded-xl transition-colors border border-white/10"
-          >
-            <Terminal className="w-3 h-3 text-orange-400" />
-            <span>{showLogs ? 'Hide Log' : 'Stream Log'}</span>
-          </button>
         </div>
       </div>
-
-      {/* Real-time Stream Terminal Log (Collapsible) */}
-      <AnimatePresence>
-        {showLogs && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="bg-black text-emerald-400 font-mono text-[11px] p-4 border-b border-slate-800 space-y-2 overflow-hidden"
-          >
-            <div className="flex items-center justify-between text-[10px] text-slate-400 border-b border-white/10 pb-1">
-              <span>Flutter / Dart Stream packet listener</span>
-              <span>ID: {order.id}</span>
-            </div>
-            <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
-              <div className="text-slate-400">
-                &gt; Supabase.instance.client.from('orders').stream(primaryKey: ['id']).eq('id', '{order.id}').listen(...)
-              </div>
-              {streamLogs.map(log => (
-                <div key={log.id} className="flex items-start gap-2 text-[10px] leading-tight">
-                  <span className="text-slate-500 shrink-0">[{log.timestamp}]</span>
-                  <span className="text-orange-400 shrink-0">[{log.type}]</span>
-                  <span className="text-slate-200">{log.message}</span>
-                </div>
-              ))}
-              {streamLogs.length === 0 && (
-                <div className="text-slate-500 italic">Listening for incoming PostgreSQL changes...</div>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Main Delivery Info Card */}
       <div className="flex-1 bg-white rounded-t-[36px] -mt-5 relative z-20 shadow-[0_-15px_30px_rgba(0,0,0,0.06)] p-6 flex flex-col space-y-5 pb-24">
@@ -450,15 +462,15 @@ export default function Tracking({ order, onBack }: TrackingProps) {
           </div>
         </section>
 
-        {/* Supabase Order Payload & Stream Diagnostics */}
+        {/* Booking & Dispatch Details Card */}
         <section className="bg-slate-900 text-white p-5 rounded-3xl shadow-md border border-slate-800 space-y-3">
           <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
             <div className="flex items-center gap-2">
               <Database className="w-4 h-4 text-orange-400" />
-              <span className="text-xs font-bold text-slate-200">Supabase Order Payload</span>
+              <span className="text-xs font-bold text-slate-200">Booking & Dispatch Details</span>
             </div>
             <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-              {order.synced_to_supabase ? 'Synced to Cloud' : 'Active Record'}
+              Active Order
             </span>
           </div>
           <div className="grid grid-cols-2 gap-3 text-xs">
@@ -535,47 +547,20 @@ export default function Tracking({ order, onBack }: TrackingProps) {
           </div>
         )}
 
-        {/* Delivery Agent Card */}
-        <section className="bg-slate-50 border border-slate-100 p-4 rounded-3xl flex items-center gap-4">
-          <div className="w-13 h-13 bg-slate-200 rounded-2xl overflow-hidden border-2 border-white shadow-sm ring-4 ring-slate-100 shrink-0">
-            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=rahul" alt="agent" className="w-full h-full object-cover" />
-          </div>
-          <div className="flex-1">
-            <h3 className="font-bold text-slate-800 leading-none mb-1">Rahul Sharma</h3>
-            <div className="flex items-center gap-1">
-              <div className="flex text-orange-400">
-                {[1, 2, 3, 4, 5].map(i => (
-                  <svg key={i} className="w-3 h-3 fill-current" viewBox="0 0 20 20">
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                  </svg>
-                ))}
-              </div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">4.9 (2k+ trips)</span>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button 
-              onClick={() => {
-                setActionNotice('Calling driver Rahul (+91 98765 43210)...');
-                setTimeout(() => setActionNotice(null), 3000);
-              }}
-              className="w-10 h-10 bg-white shadow-sm border border-slate-100 rounded-xl flex items-center justify-center text-orange-500 hover:bg-orange-50 transition-colors"
-              title="Call driver"
-            >
-              <Phone className="w-4 h-4" />
-            </button>
-            <button 
-              onClick={() => {
-                setActionNotice('Direct dispatch message sent to Rahul');
-                setTimeout(() => setActionNotice(null), 3000);
-              }}
-              className="w-10 h-10 bg-white shadow-sm border border-slate-100 rounded-xl flex items-center justify-center text-blue-500 hover:bg-blue-50 transition-colors"
-              title="Message driver"
-            >
-              <MessageSquare className="w-4 h-4" />
-            </button>
-          </div>
-        </section>
+        {/* Driver & Vehicle Details View */}
+        <DriverDetailsView
+          isAssigned={isAssigned}
+          driver={driverInfo}
+          onCallDriver={(phone) => {
+            setActionNotice(`Calling driver at ${phone}...`);
+            window.location.href = `tel:${phone.replace(/\s+/g, '')}`;
+            setTimeout(() => setActionNotice(null), 3500);
+          }}
+          onMessageDriver={(name) => {
+            setActionNotice(`Direct dispatch message sent to ${name}`);
+            setTimeout(() => setActionNotice(null), 3500);
+          }}
+        />
 
         {/* Action Notice Toast */}
         <AnimatePresence>
@@ -599,7 +584,7 @@ export default function Tracking({ order, onBack }: TrackingProps) {
             <div className="space-y-6 relative">
               <ProgressStep 
                 title="Order Confirmed" 
-                desc="Saved in Supabase orders table" 
+                desc="Booking confirmed at dispatch center" 
                 active={true} 
                 completed={status !== 'processing'} 
               />

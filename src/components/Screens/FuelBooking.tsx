@@ -1,198 +1,98 @@
-import { useState } from 'react';
 import { motion } from 'motion/react';
-import { ChevronLeft, MapPin, Fuel, ArrowRight } from 'lucide-react';
-import { UserLocation, Product } from '../../types';
+import { ChevronLeft, Fuel, ShieldCheck, ArrowRight, Wrench, AlertTriangle } from 'lucide-react';
+import { UserLocation, Product, Screen } from '../../types';
+import { FUEL_COMING_SOON_MESSAGE } from '../../config/fuelConfig';
 
 interface FuelBookingProps {
   products: Product[];
   onBack: () => void;
-  onAddToCart: (p: Product, q: number) => void;
-  onGoToCheckout: () => void;
+  onAddToCart?: (p: Product, q: number) => void;
+  onGoToCheckout?: () => void;
   onOrderFuelDirect?: (p: Product, q: number) => Promise<void> | void;
+  onNavigate?: (screen: Screen) => void;
   location: UserLocation;
 }
 
-export default function FuelBooking({ 
-  products, 
-  onBack, 
-  onAddToCart, 
-  onGoToCheckout, 
-  onOrderFuelDirect,
-  location 
-}: FuelBookingProps) {
-  const [selectedProduct, setSelectedProduct] = useState<Product>(products[0]);
-  const [quantity, setQuantity] = useState(10);
-  const [isOrdering, setIsOrdering] = useState(false);
-
-  const handleOrderFuel = async () => {
-    setIsOrdering(true);
-    try {
-      if (onOrderFuelDirect) {
-        await onOrderFuelDirect(selectedProduct, quantity);
-      } else {
-        onAddToCart(selectedProduct, quantity);
-        onGoToCheckout();
-      }
-    } catch (e) {
-      console.error('Order Fuel failed', e);
-      setIsOrdering(false);
-    }
-  };
-
-  const handleAddToCartOnly = () => {
-    onAddToCart(selectedProduct, quantity);
-    onGoToCheckout();
-  };
-
+export default function FuelBooking({ onBack, onNavigate }: FuelBookingProps) {
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50">
+    <div className="flex flex-col min-h-screen bg-slate-50 font-sans">
       {/* Header */}
-      <header className="p-4 flex items-center gap-4 bg-white sticky top-0 z-20 border-b border-slate-100">
-        <button onClick={onBack} className="p-2 hover:bg-slate-50 rounded-full transition-colors">
+      <header className="p-4 flex items-center gap-4 bg-white sticky top-0 z-20 border-b border-slate-100 shadow-xs">
+        <button 
+          onClick={onBack} 
+          className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-700"
+          title="Go back"
+        >
           <ChevronLeft className="w-6 h-6" />
         </button>
-        <h1 className="font-bold text-xl">Order Fuel</h1>
+        <h1 className="font-bold text-lg text-slate-900">Order Fuel</h1>
       </header>
 
-      <div className="flex-1 p-6 space-y-8">
-        {/* Station Info Banner */}
-        <section className="relative h-32 rounded-3xl overflow-hidden shadow-md shadow-orange-50 group">
-          <img 
-            src="https://images.unsplash.com/photo-1545644161-591605335805?auto=format&fit=crop&q=80&w=600" 
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
-            alt="Station"
-            referrerPolicy="no-referrer"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-orange-600/80 to-transparent p-5 flex flex-col justify-center">
-            <span className="text-[10px] text-white/70 font-black uppercase tracking-widest mb-1">Dispatching from</span>
-            <h2 className="text-white text-lg font-bold leading-tight">Fugo Express {location.city} Hub</h2>
-            <p className="text-white/80 text-[10px] mt-0.5">Automated quality check enabled</p>
-          </div>
-        </section>
+      <div className="flex-1 p-6 flex flex-col items-center justify-center max-w-md mx-auto w-full space-y-6 text-center">
+        {/* Animated Icon Badge */}
+        <motion.div 
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="w-24 h-24 bg-gradient-to-tr from-amber-500 to-orange-500 rounded-3xl flex items-center justify-center shadow-xl shadow-orange-500/20 text-white relative"
+        >
+          <Fuel className="w-12 h-12" />
+          <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-4 w-4 bg-orange-600"></span>
+          </span>
+        </motion.div>
 
-        {/* Product Selection */}
-        <section>
-          <label className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-4 block">Select Fuel Type</label>
-          <div className="grid grid-cols-2 gap-4">
-            {products.map(p => (
-              <button
-                key={p.id}
-                onClick={() => setSelectedProduct(p)}
-                className={`relative p-5 rounded-2xl border-2 transition-all text-left ${
-                  selectedProduct.id === p.id 
-                    ? 'border-orange-500 bg-orange-50/50 shadow-md ring-4 ring-orange-500/10' 
-                    : 'border-slate-100 bg-white hover:border-slate-200 shadow-sm'
-                }`}
-              >
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${selectedProduct.id === p.id ? 'bg-orange-500' : 'bg-slate-100'}`}>
-                   <Fuel className={`${selectedProduct.id === p.id ? 'text-white' : 'text-slate-400'} w-5 h-5`} />
-                </div>
-                <h3 className="font-bold text-sm mb-1">{p.name}</h3>
-                <p className="text-orange-600 font-bold text-lg">₹{p.price}<span className="text-[10px] text-slate-400 font-normal ml-0.5">/{p.unit}</span></p>
-                {selectedProduct.id === p.id && (
-                  <motion.div layoutId="check" className="absolute top-4 right-4 w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center">
-                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                  </motion.div>
-                )}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        {/* Quantity Selection */}
-        <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm shadow-slate-100">
-           <div className="flex justify-between items-center mb-6">
-              <label className="text-[10px] uppercase tracking-widest font-bold text-slate-400">Total Quantity</label>
-              <div className="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-xs font-bold">{quantity} {selectedProduct.unit}</div>
-           </div>
-           
-           <input 
-              type="range" 
-              min="5" 
-              max="100" 
-              step="5"
-              value={quantity}
-              onChange={(e) => setQuantity(Number(e.target.value))}
-              className="w-full accent-orange-500 h-2 bg-slate-100 rounded-full appearance-none cursor-pointer mb-6"
-           />
-           
-           <div className="grid grid-cols-4 gap-2">
-              {[10, 20, 50, 100].map(val => (
-                <button 
-                  key={val}
-                  onClick={() => setQuantity(val)}
-                  className={`py-2 rounded-xl text-sm font-bold transition-colors ${quantity === val ? 'bg-orange-500 text-white shadow-lg shadow-orange-100' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
-                >
-                  {val} {selectedProduct.unit}
-                </button>
-              ))}
-           </div>
-        </section>
-
-        {/* Address Preview */}
-        <section className="bg-slate-900 text-white p-6 rounded-3xl shadow-xl shadow-slate-200">
-          <div className="flex items-start gap-4">
-             <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center shrink-0">
-                <MapPin className="text-orange-400 w-5 h-5" />
-             </div>
-             <div className="flex-1">
-                <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-1">Standard Delivery • {location.city} Station</p>
-                <h3 className="font-semibold text-sm mb-1 leading-tight">{location.name}: {location.address}, {location.city}</h3>
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
-                  <span className="text-[10px] font-bold text-green-400 uppercase tracking-widest">Nearby Station (350m) • 15 Mins</span>
-                </div>
-             </div>
-          </div>
-        </section>
-      </div>
-
-      {/* Footer Payment Info */}
-      <footer className="p-6 bg-white border-t border-slate-100 mt-auto space-y-3">
-        <div className="flex items-center justify-between mb-2">
-           <div>
-              <p className="text-xs text-slate-400 font-medium">Total Amount</p>
-              <h2 className="text-2xl font-bold text-slate-900">₹{(quantity * selectedProduct.price).toLocaleString()}</h2>
-           </div>
-           <p className="text-[10px] text-slate-400 text-right font-medium">Includes delivery fee <br /> & tamper-proof seal</p>
+        {/* Heading & Badge */}
+        <div className="space-y-2">
+          <span className="text-[11px] font-black uppercase tracking-widest bg-orange-100 text-orange-800 px-3 py-1 rounded-full border border-orange-200 inline-block">
+            Coming Soon
+          </span>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+            Fuel Delivery Coming Soon
+          </h2>
         </div>
-        
-        {/* Main "Order Fuel" CTA */}
-        <button
-          onClick={handleOrderFuel}
-          disabled={isOrdering}
-          className={`w-full py-4.5 rounded-2xl font-black text-sm uppercase tracking-wider shadow-xl transition-all flex items-center justify-center gap-2 group ${
-            isOrdering 
-              ? 'bg-slate-900 text-white cursor-wait' 
-              : 'bg-orange-500 text-white shadow-orange-200 hover:bg-orange-600 active:scale-[0.98]'
-          }`}
-        >
-          {isOrdering ? (
-            <>
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
-                className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
-              />
-              <span>Inserting Order & Connecting Live Stream...</span>
-            </>
-          ) : (
-            <>
-              <Fuel className="w-4 h-4" />
-              <span>Order Fuel ({quantity}{selectedProduct.unit})</span>
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </>
-          )}
-        </button>
 
-        <button
-          onClick={handleAddToCartOnly}
-          disabled={isOrdering}
-          className="w-full py-2.5 text-xs text-slate-500 font-bold hover:text-slate-800 transition-colors text-center"
-        >
-          Add to Cart & Combine with Spare Parts
-        </button>
-      </footer>
+        {/* Official notice box */}
+        <div className="bg-white border border-slate-200/90 rounded-3xl p-5 shadow-sm text-left space-y-3">
+          <div className="flex items-start gap-3">
+            <ShieldCheck className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
+            <p className="text-xs text-slate-700 leading-relaxed font-medium">
+              {FUEL_COMING_SOON_MESSAGE}
+            </p>
+          </div>
+          <div className="border-t border-slate-100 pt-3 text-[11px] text-slate-500">
+            All safety audits and PESO vehicle compliances are underway to ensure certified calibration and safe doorstep fueling.
+          </div>
+        </div>
+
+        {/* Live Alternative Services CTA */}
+        <div className="w-full space-y-2.5">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+            Available Services Right Now
+          </p>
+          
+          <button
+            onClick={() => onNavigate ? onNavigate('appointment') : onBack()}
+            className="w-full p-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center justify-between shadow-md shadow-indigo-200 transition-all active:scale-[0.98]"
+          >
+            <div className="flex items-center gap-3">
+              <Wrench className="w-5 h-5 text-indigo-200" />
+              <div className="text-left">
+                <span className="block font-bold">Book Doorstep Repair</span>
+                <span className="text-[10px] text-indigo-200 font-normal">Expert Mechanic & Diagnostics</span>
+              </div>
+            </div>
+            <ArrowRight className="w-4 h-4 text-indigo-200" />
+          </button>
+
+          <button
+            onClick={onBack}
+            className="w-full py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-2xl transition-colors"
+          >
+            Back to Home
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

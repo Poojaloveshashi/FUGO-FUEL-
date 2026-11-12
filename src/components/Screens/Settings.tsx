@@ -5,16 +5,18 @@ import { Screen } from '../../types';
 interface SettingsProps {
   onBack: () => void;
   userPhone: string;
+  userEmail?: string | null;
+  displayName?: string | null;
   onLogout: () => void;
   onNavigate: (screen: Screen) => void;
 }
 
-export default function Settings({ onBack, userPhone, onLogout, onNavigate }: SettingsProps) {
+export default function Settings({ onBack, userPhone, userEmail, displayName, onLogout, onNavigate }: SettingsProps) {
   const sections = [
     {
       title: 'Profile Settings',
       items: [
-        { icon: User, label: 'Personal Information', value: userPhone, color: 'text-blue-500', bg: 'bg-blue-50', onClick: () => onNavigate('profile') },
+        { icon: User, label: 'Personal Information', value: userEmail || userPhone, color: 'text-blue-500', bg: 'bg-blue-50', onClick: () => onNavigate('profile') },
         { icon: History, label: 'Order History', value: 'Recent orders', color: 'text-orange-600', bg: 'bg-orange-100', onClick: () => onNavigate('orders') },
         { icon: CreditCard, label: 'Payment Methods', value: '2 Cards Saved', color: 'text-orange-500', bg: 'bg-orange-50', onClick: () => onNavigate('payments') },
         { icon: MapPin, label: 'Saved Addresses', value: '3 Locations', color: 'text-green-500', bg: 'bg-green-50', onClick: () => onNavigate('addresses') },
@@ -50,12 +52,13 @@ export default function Settings({ onBack, userPhone, onLogout, onNavigate }: Se
       <div className="flex-1 p-6 space-y-8">
         {/* Profile Card */}
         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
-          <div className="w-16 h-16 bg-orange-500 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-orange-100">
-            {userPhone.slice(-1)}
+          <div className="w-16 h-16 bg-gradient-to-tr from-indigo-600 to-indigo-800 rounded-2xl flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-indigo-100">
+            {(displayName || userEmail || userPhone || 'F').charAt(0).toUpperCase()}
           </div>
-          <div>
-            <h2 className="font-bold text-slate-800">Premium User</h2>
-            <p className="text-sm text-slate-400">{userPhone}</p>
+          <div className="min-w-0">
+            <h2 className="font-bold text-slate-800 truncate">{displayName || 'Verified Fugo User'}</h2>
+            {userEmail && <p className="text-xs text-indigo-600 font-medium truncate">{userEmail}</p>}
+            <p className="text-xs text-slate-400 font-mono mt-0.5">{userPhone}</p>
           </div>
         </div>
 

@@ -19,6 +19,7 @@ import {
   PackageCheck
 } from 'lucide-react';
 import { Product } from '../../types';
+import { FUEL_SALES_ENABLED } from '../../config/fuelConfig';
 
 interface StoreProps {
   title: string;
@@ -70,6 +71,9 @@ export default function Store({ title, products, onBack, onAddToCart, onGoToChec
   // Filter and sort items
   const filteredProducts = useMemo(() => {
     let result = products.filter(p => {
+      // Disallow fuel products when fuel sales are disabled
+      if (!FUEL_SALES_ENABLED && p.category === 'fuel') return false;
+
       // Search
       const q = search.toLowerCase().trim();
       const matchSearch = !q || 
@@ -356,13 +360,26 @@ export default function Store({ title, products, onBack, onAddToCart, onGoToChec
               {/* Price, Unit & Add Button */}
               <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
                 <div>
-                  <div className="flex items-baseline gap-1">
+                  <div className="flex items-baseline gap-1.5">
                     <span className="text-lg font-black text-slate-900">₹{p.price.toLocaleString('en-IN')}</span>
                     <span className="text-[10px] text-slate-400 font-semibold">/{p.unit}</span>
                   </div>
-                  {p.originalPrice && (
-                    <span className="text-[9px] text-slate-400 line-through">₹{p.originalPrice.toLocaleString('en-IN')}</span>
-                  )}
+                  {(() => {
+                    const mrp = p.mrp || p.originalPrice || Math.round(p.price * 1.25);
+                    const savings = mrp - p.price;
+                    return (
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-[10px] text-slate-400">
+                          MRP: <span className="line-through">₹{mrp.toLocaleString('en-IN')}</span>
+                        </span>
+                        {savings > 0 && (
+                          <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                            Save ₹{savings}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <button 

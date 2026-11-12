@@ -14,6 +14,7 @@ import {
   Clock
 } from 'lucide-react';
 import { UserLocation } from '../../types';
+import { FUEL_SALES_ENABLED } from '../../config/fuelConfig';
 
 interface SOSModalProps {
   isOpen: boolean;
@@ -66,7 +67,9 @@ const SOS_OPTIONS = [
 ];
 
 export default function SOSModal({ isOpen, onClose, onRequestSOS, location }: SOSModalProps) {
-  const [selectedSos, setSelectedSos] = useState(SOS_OPTIONS[0]);
+  const [selectedSos, setSelectedSos] = useState(
+    !FUEL_SALES_ENABLED ? SOS_OPTIONS[1] : SOS_OPTIONS[0]
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
@@ -162,28 +165,38 @@ export default function SOSModal({ isOpen, onClose, onRequestSOS, location }: SO
               <div className="space-y-2.5">
                 {SOS_OPTIONS.map(opt => {
                   const Icon = opt.icon;
+                  const isFuel = opt.id === 'fuel_dry';
+                  const isDisabled = !FUEL_SALES_ENABLED && isFuel;
                   const isSelected = selectedSos.id === opt.id;
+
                   return (
                     <button
                       key={opt.id}
                       type="button"
+                      disabled={isDisabled}
                       onClick={() => setSelectedSos(opt)}
                       className={`w-full p-3.5 rounded-2xl border-2 text-left flex items-center gap-3.5 transition-all ${
-                        isSelected
+                        isDisabled
+                          ? 'border-slate-200/60 bg-slate-50/70 opacity-60 cursor-not-allowed'
+                          : isSelected
                           ? 'border-red-500 bg-red-50/50 shadow-md ring-2 ring-red-500/20'
-                          : 'border-slate-100 hover:border-slate-200 bg-white'
+                          : 'border-slate-100 hover:border-slate-200 bg-white cursor-pointer'
                       }`}
                     >
-                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${opt.color} text-white shadow`}>
+                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${isDisabled ? 'bg-slate-300' : opt.color} text-white shadow`}>
                         <Icon className="w-5 h-5" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-0.5">
                           <h4 className="font-bold text-sm text-slate-900 truncate">{opt.title}</h4>
                           <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
-                            isSelected ? 'bg-red-500 text-white' : 'bg-slate-100 text-slate-600'
+                            isDisabled
+                              ? 'bg-amber-100 text-amber-800'
+                              : isSelected 
+                              ? 'bg-red-500 text-white' 
+                              : 'bg-slate-100 text-slate-600'
                           }`}>
-                            {opt.badge}
+                            {isDisabled ? 'Coming soon' : opt.badge}
                           </span>
                         </div>
                         <p className="text-xs text-slate-500 line-clamp-1">{opt.desc}</p>
@@ -194,14 +207,12 @@ export default function SOSModal({ isOpen, onClose, onRequestSOS, location }: SO
               </div>
             </div>
 
-            {/* Supabase Realtime Pipeline Notice */}
+            {/* Priority Dispatch Pipeline Notice */}
             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 flex items-start gap-3">
               <Radio className="w-5 h-5 text-red-500 shrink-0 mt-0.5 animate-pulse" />
               <div className="text-xs text-slate-600 leading-relaxed">
-                <span className="font-bold text-slate-800">Supabase Real-Time Pipeline: </span>
-                Clicking <strong className="text-red-600 font-bold">Request SOS</strong> inserts record to{' '}
-                <code className="bg-slate-200 px-1 py-0.5 rounded text-[10px] font-mono">orders</code> with{' '}
-                <code className="bg-slate-200 px-1 py-0.5 rounded text-[10px] font-mono">status: 'PENDING'</code> and a 4-digit security OTP.
+                <span className="font-bold text-slate-800">Priority Roadside Dispatch: </span>
+                Clicking <strong className="text-red-600 font-bold">Request SOS</strong> immediately alerts the closest technician van and tow recovery team to dispatch to your live GPS coordinates with 24/7 security verification.
               </div>
             </div>
           </div>

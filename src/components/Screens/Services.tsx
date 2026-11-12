@@ -129,7 +129,17 @@ export default function Services({
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs font-black text-slate-900">₹{service.price}</p>
+                      <div className="flex items-baseline justify-end gap-1">
+                        <span className="text-xs font-black text-slate-900">₹{service.price}</span>
+                      </div>
+                      {(() => {
+                        const mrp = service.mrp || service.originalPrice || Math.round(service.price * 1.4);
+                        return (
+                          <div className="text-[10px] text-slate-400">
+                            MRP: <span className="line-through">₹{mrp}</span>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>

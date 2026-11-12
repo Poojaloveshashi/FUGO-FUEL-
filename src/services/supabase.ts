@@ -102,10 +102,11 @@ export function generateDeliveryOtp(): string {
   return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
+import { FUEL_SALES_ENABLED, FUEL_COMING_SOON_MESSAGE } from '../config/fuelConfig';
+
 /**
  * Order Fuel helper: Inserts a record into the 'orders' table with status 'PENDING'.
- * Sends service_type 'FUEL', address, price, and customer_phone.
- * Stops sending driver_lat, driver_lng, driver_speed_kmh.
+ * While FUEL_SALES_ENABLED is false, fuel orders are blocked.
  */
 export async function orderFuel({
   fuelType = 'Clean Diesel (BS-VI)',
@@ -128,6 +129,9 @@ export async function orderFuel({
   totalAmount?: number;
   paymentStatus?: 'PAID' | 'UNPAID';
 }) {
+  if (!FUEL_SALES_ENABLED) {
+    throw new Error(FUEL_COMING_SOON_MESSAGE);
+  }
   const otp = generateDeliveryOtp();
   const effectiveCustomerId = customerId || getCustomerIdFromPhone(customerPhone);
   return placeSupabaseOrder({
@@ -176,7 +180,7 @@ export async function requestSOS({
   const otp = generateDeliveryOtp();
   const effectiveCustomerId = customerId || getCustomerIdFromPhone(customerPhone);
   return placeSupabaseOrder({
-    service_type: 'FUEL',
+    service_type: 'REPAIR',
     customer_id: effectiveCustomerId,
     customer_phone: customerPhone,
     fuel_type: sosType,
@@ -267,8 +271,8 @@ export async function fetchAppSettings(forceRefresh = false): Promise<AppSetting
   if (cachedSettings && !forceRefresh) return cachedSettings;
 
   const defaults: AppSettings = {
-    merchant_vpa: '6300352955@ibl',
-    merchant_name: 'Fugo',
+    merchant_vpa: '',
+    merchant_name: '',
     gstin: '',
     transport_fee: 100,
   };
@@ -335,6 +339,25 @@ export async function fetchMyOtp(orderId: string, customerId: string): Promise<s
   return null;
 }
 
+let knownOrderColumns: Set<string> | null = null;
+
+/**
+ * Detects available columns in public.orders to prevent PGRST204 errors when inserting.
+ */
+export async function detectOrderColumns(client: SupabaseClient): Promise<Set<string> | null> {
+  if (knownOrderColumns) return knownOrderColumns;
+  try {
+    const { data, error } = await client.from('orders').select('*').limit(1);
+    if (!error && data && data.length > 0) {
+      knownOrderColumns = new Set(Object.keys(data[0]));
+      return knownOrderColumns;
+    }
+  } catch (e) {
+    console.warn('Could not inspect orders columns', e);
+  }
+  return null;
+}
+
 /**
  * Inserts a record into the 'orders' table.
  * Sends payment_method ("COD" or "UPI"), total_amount, delivery_fee, gst_amount.
@@ -354,10 +377,40 @@ export async function placeSupabaseOrder(
   const gstAmount = payload.gst_amount ?? Math.round(Number(totalAmount) * 0.18);
   const paymentMethod = payload.payment_method === 'UPI' ? 'UPI' : 'COD';
 
+  if (!FUEL_SALES_ENABLED && payload.service_type === 'FUEL') {
+    const blockedRecord: SupabaseOrderRecord = {
+      id,
+      created_at: createdAt,
+      service_type: 'FUEL',
+      status: 'PENDING',
+      handshake_otp: '',
+      otp: '',
+      payment_status: 'PENDING',
+      payment_method: paymentMethod,
+      customer_location: '',
+      address: payload.address || '',
+      total_amount: totalAmount,
+      price,
+      delivery_fee: deliveryFee,
+      gst_amount: gstAmount,
+      customer_id: payload.customer_id || '',
+      customer_name: payload.customer_name || '',
+      customer_phone: payload.customer_phone,
+      source: 'local_storage',
+      last_updated_at: createdAt,
+    };
+    return {
+      success: false,
+      data: blockedRecord,
+      cloudSynced: false,
+      error: 'Fuel delivery is coming soon. We are completing the licences and safety approvals needed to sell and deliver fuel.',
+    };
+  }
+
   const record: SupabaseOrderRecord = {
     id,
     created_at: createdAt,
-    service_type: payload.service_type || 'FUEL',
+    service_type: payload.service_type || 'REPAIR',
     status: (payload.status as any) || 'PENDING',
     handshake_otp: handshakeOtp,
     otp: handshakeOtp,
@@ -423,12 +476,27 @@ export async function placeSupabaseOrder(
     }
 
     const targetClient = client || defaultSupabaseClient;
+
+    // Proactively drop columns that are not in the database schema
+    const detectedCols = await detectOrderColumns(targetClient);
+    if (detectedCols && detectedCols.size > 0) {
+      for (const key of Object.keys(cleanPayload)) {
+        if (!detectedCols.has(key)) {
+          delete cleanPayload[key];
+        }
+      }
+      // If table requires valid UUID for id, strip non-UUID IDs
+      if (cleanPayload.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanPayload.id)) {
+        delete cleanPayload.id;
+      }
+    }
+
     let data: any = null;
     let error: any = null;
 
-    // Retry loop handling schema cache differences (PGRST204 missing columns before migration, or 22P02 uuid format)
+    // Retry loop handling schema cache differences (PGRST204 missing columns, 22P02 uuid format, 23502 not-null)
     let attempts = 0;
-    while (attempts < 6) {
+    while (attempts < 25) {
       attempts++;
       const res = await targetClient
         .from('orders')
@@ -445,9 +513,13 @@ export async function placeSupabaseOrder(
       // If a column is missing in schema cache before migration is run, drop the missing column and retry
       if (error.code === 'PGRST204') {
         const match = error.message?.match(/Could not find the '([^']+)' column/);
-        if (match && match[1] && match[1] in cleanPayload) {
-          delete cleanPayload[match[1]];
-          continue;
+        if (match && match[1]) {
+          const missingCol = match[1];
+          if (missingCol in cleanPayload) {
+            delete cleanPayload[missingCol];
+            if (knownOrderColumns) knownOrderColumns.delete(missingCol);
+            continue;
+          }
         }
       }
 
@@ -457,6 +529,25 @@ export async function placeSupabaseOrder(
         if (cleanPayload.id !== fallbackUuid) {
           cleanPayload.id = fallbackUuid;
           continue;
+        } else {
+          delete cleanPayload.id;
+          continue;
+        }
+      }
+
+      // If NOT NULL constraint error on legacy schema (e.g. column "otp" cannot be null)
+      if (error.code === '23502') {
+        const notNullMatch = error.message?.match(/null value in column "([^"]+)"/);
+        if (notNullMatch && notNullMatch[1]) {
+          const col = notNullMatch[1];
+          if (col === 'otp') {
+            cleanPayload.otp = String(handshakeOtp || '1234');
+            continue;
+          }
+          if (['total_amount', 'price', 'litres', 'amount'].includes(col)) {
+            cleanPayload[col] = 0;
+            continue;
+          }
         }
       }
 

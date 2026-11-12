@@ -18,6 +18,7 @@ export interface Product {
   name: string;
   price: number;
   originalPrice?: number;
+  mrp?: number;
   exchangeDiscount?: number;
   unit: string;
   image: string;
@@ -58,9 +59,12 @@ export interface SupabaseOrderPayload {
   driver_lat?: number;
   driver_lng?: number;
   driver_speed_kmh?: number;
+  driver_id?: string;
   driver_name?: string;
   driver_phone?: string;
   driver_vehicle?: string;
+  vehicle_name?: string;
+  vehicle_plate?: string;
   eta_minutes?: number;
   last_updated_at?: string;
   parent_order_id?: string;
@@ -155,9 +159,12 @@ export interface Order {
   driver_lat?: number;
   driver_lng?: number;
   driver_speed_kmh?: number;
+  driver_id?: string;
   driver_name?: string;
   driver_phone?: string;
   driver_vehicle?: string;
+  vehicle_name?: string;
+  vehicle_plate?: string;
   eta_minutes?: number;
   otp: string;
   handshake_otp: string;

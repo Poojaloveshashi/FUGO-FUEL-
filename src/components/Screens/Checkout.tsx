@@ -40,7 +40,7 @@ export default function Checkout({ cart, onBack, onPlaceOrder, handleOrderSubmit
   // Only two methods work: 'cod' (Cash on delivery) and 'upi' (UPI at the door)
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'upi'>('cod');
   const [appSettings, setAppSettings] = useState<AppSettings>({
-    merchant_vpa: '6300352955@ibl',
+    merchant_vpa: '',
     merchant_name: 'Fugo',
     gstin: '',
     transport_fee: 100,

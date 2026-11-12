@@ -250,6 +250,24 @@ export default function FuelPrices({ onBack, onNavigate, onAddToCart }: FuelPric
         {/* TAB 1: FUEL, CNG & EV COMMODITIES */}
         {activeTab === 'fuel' && (
           <div className="space-y-6">
+            {/* Coming Soon Notice Card */}
+            <div className="bg-amber-500/10 border border-amber-300 rounded-3xl p-4 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black shrink-0">
+                ⏳
+              </div>
+              <div className="text-xs">
+                <div className="flex items-center gap-2">
+                  <h4 className="font-black text-slate-900">Diesel & Petrol Delivery Coming Soon</h4>
+                  <span className="text-[9px] font-black uppercase tracking-wider bg-amber-500 text-slate-950 px-2 py-0.2 rounded-full">
+                    Notice
+                  </span>
+                </div>
+                <p className="text-slate-600 mt-1 leading-relaxed">
+                  Mobile bowser doorstep delivery is rolling out under safety certification. All prices below reflect current daily government station benchmarks. Doorstep repair, roadside rescue, and spare parts with transparent MRP are currently live.
+                </p>
+              </div>
+            </div>
+
             {/* City Selector */}
             <section className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-xs">
               <div className="flex items-center justify-between mb-3 px-1">
@@ -284,11 +302,11 @@ export default function FuelPrices({ onBack, onNavigate, onAddToCart }: FuelPric
             <section className="space-y-3">
               <div className="flex items-center justify-between px-1">
                 <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">
-                  Live Station Rates • {activeCity}
+                  Live Station Benchmarks • {activeCity}
                 </h3>
-                <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Live Sync
+                <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  Coming Soon
                 </span>
               </div>
 
@@ -324,16 +342,14 @@ export default function FuelPrices({ onBack, onNavigate, onAddToCart }: FuelPric
                     <p className="text-[11px] text-slate-400 mt-2 line-clamp-1">{comm.description}</p>
 
                     <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase">Doorstep Delivery</span>
-                      {onNavigate && (
-                        <button
-                          onClick={() => onNavigate('fuel')}
-                          className="text-[11px] font-black text-orange-600 hover:text-orange-700 flex items-center gap-1 group"
-                        >
-                          <span>Order Now</span>
-                          <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-                        </button>
-                      )}
+                      <span className="text-[10px] font-mono text-slate-400">Live Station Benchmark</span>
+                      <button
+                        type="button"
+                        disabled
+                        className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-400 font-bold text-xs cursor-not-allowed border border-slate-200"
+                      >
+                        Coming soon
+                      </button>
                     </div>
                   </motion.div>
                 ))}
@@ -733,10 +749,22 @@ export default function FuelPrices({ onBack, onNavigate, onAddToCart }: FuelPric
 
                     <div className="flex items-center gap-2.5 shrink-0">
                       <div className="text-right">
-                        <p className="text-sm font-black text-slate-900 leading-none">
-                          ₹{p.price.toLocaleString('en-IN')}
-                        </p>
-                        <p className="text-[9px] text-slate-400 font-semibold mt-0.5">/{p.unit}</p>
+                        {(() => {
+                          const mrp = p.mrp || p.originalPrice || Math.round(p.price * 1.25);
+                          return (
+                            <>
+                              {mrp > p.price && (
+                                <p className="text-[10px] text-slate-400 leading-tight">
+                                  MRP: <span className="line-through">₹{mrp.toLocaleString('en-IN')}</span>
+                                </p>
+                              )}
+                              <p className="text-sm font-black text-slate-900 leading-none mt-0.5">
+                                ₹{p.price.toLocaleString('en-IN')}
+                              </p>
+                              <p className="text-[9px] text-slate-400 font-semibold mt-0.5">/{p.unit}</p>
+                            </>
+                          );
+                        })()}
                       </div>
 
                       {onAddToCart && (

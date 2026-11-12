@@ -102,7 +102,13 @@ export const supabaseAnonKey = (storedConfigKey && isValidSupabaseKey(storedConf
   ? envKey
   : DEFAULT_SUPABASE_KEY;
 
-export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  },
+});
 
 export const SUPABASE_URL = supabaseUrl;
 export const SUPABASE_ANON_KEY = supabaseAnonKey;

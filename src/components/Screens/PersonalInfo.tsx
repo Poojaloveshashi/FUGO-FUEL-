@@ -5,12 +5,14 @@ import { useState } from 'react';
 interface PersonalInfoProps {
   onBack: () => void;
   userPhone: string;
+  userEmail?: string | null;
+  displayName?: string | null;
 }
 
-export default function PersonalInfo({ onBack, userPhone }: PersonalInfoProps) {
+export default function PersonalInfo({ onBack, userPhone, userEmail, displayName }: PersonalInfoProps) {
   const [formData, setFormData] = useState({
-    fullName: 'Premium User',
-    email: 'user@fugo.com',
+    fullName: displayName || 'Verified Customer',
+    email: userEmail || 'customer@fugo.in',
     phone: userPhone,
     dob: '1995-08-15',
     gender: 'Male'

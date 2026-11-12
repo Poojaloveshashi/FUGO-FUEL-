@@ -97,7 +97,7 @@ export default function CompanionSyncModal({
   };
 
   const handleCopyPrompt = () => {
-    const promptText = `Connect this app to our live Supabase database. Use @supabase/supabase-js. Use YOUR_SUPABASE_URL and YOUR_SUPABASE_ANON_KEY. When an order is placed, insert it into the orders table with status 'PENDING', generate a 4-digit OTP, and subscribe to real-time changes on that order. Connect with customer app: https://ai.studio/apps/${CURRENT_APP_ID}`;
+    const promptText = `Connect this driver app to our live database. When an order is placed, synchronize with the orders table with status 'PENDING', verify delivery OTP, and stream real-time driver GPS coordinates. Connect with customer app: https://ai.studio/apps/${CURRENT_APP_ID}`;
     navigator.clipboard?.writeText(promptText);
     setCopiedPrompt(true);
     setTimeout(() => setCopiedPrompt(false), 2000);
@@ -185,10 +185,10 @@ export default function CompanionSyncModal({
               <div className="bg-slate-50 border border-slate-200 p-2.5 rounded-2xl">
                 <div className="flex items-center justify-center gap-1.5 mb-1 text-[11px] font-bold text-slate-700">
                   <Database className="w-3.5 h-3.5 text-blue-600" />
-                  Supabase
+                  Cloud Database
                 </div>
                 <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 inline-block">
-                  Live Postgres
+                  Live Sync
                 </span>
               </div>
 
@@ -273,7 +273,7 @@ export default function CompanionSyncModal({
                 </button>
               </div>
               <p className="text-[11px] font-mono text-slate-300 bg-black/40 p-2.5 rounded-xl leading-relaxed border border-white/5">
-                Connect this app to our live Supabase database. Use @supabase/supabase-js. Use YOUR_SUPABASE_URL and YOUR_SUPABASE_ANON_KEY. When an order is placed, insert it into the orders table with status 'PENDING', generate a 4-digit OTP, and subscribe to real-time changes on that order.
+                Connect this driver app to our live database. When an order is placed, synchronize with the orders table with status 'PENDING', verify delivery OTP, and stream real-time driver GPS coordinates.
               </p>
             </div>
 

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { getSupabaseClient, getLocalOrderById } from '../../services/supabase';
 import { SupabaseOrderRecord } from '../../types';
+import DriverDetailsView from '../Tracking/DriverDetailsView';
 
 interface RepairTrackingProps {
   orderId?: string;
@@ -216,7 +217,7 @@ export default function RepairTracking({ orderId, onBack }: RepairTrackingProps)
         <div className="flex items-center gap-2 px-3 py-1 bg-orange-50 rounded-full">
           <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
           <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">
-            Supabase Live
+            Live Updates
           </span>
         </div>
       </header>
@@ -247,6 +248,25 @@ export default function RepairTracking({ orderId, onBack }: RepairTrackingProps)
               </span>
             </div>
           </motion.div>
+        )}
+
+        {/* Assigned Tow Transport Driver Details View */}
+        {childTransportOrder && (
+          <DriverDetailsView
+            isAssigned={Boolean(childTransportOrder.driver_id || childTransportOrder.status !== 'PENDING')}
+            driver={{
+              id: childTransportOrder.driver_id || 'drv_tow_transport',
+              name: childTransportOrder.driver_name || 'Suresh Varma',
+              phone: childTransportOrder.driver_phone || '+91 94401 23456',
+              vehicleName: childTransportOrder.driver_vehicle || 'Ashok Leyland Flatbed Tow Carrier',
+              vehiclePlate: childTransportOrder.vehicle_plate || 'TS 09 XY 9102',
+              vehicleType: 'Heavy Flatbed Hydraulic Recovery Tow Carrier',
+              rating: 4.95,
+              tripsCount: 1420,
+              speedKmh: childTransportOrder.driver_speed_kmh,
+              statusText: 'Transporting vehicle safely to Central Depot'
+            }}
+          />
         )}
 
         {/* Status Pipeline Visual */}
@@ -309,22 +329,24 @@ export default function RepairTracking({ orderId, onBack }: RepairTrackingProps)
                     <Clock className="w-8 h-8 text-orange-400" />
                   </div>
                 </div>
-                
-                <div className="mt-8 flex items-center gap-4 bg-white/5 p-4 rounded-3xl border border-white/5">
-                  <img 
-                    src="https://api.dicebear.com/7.x/avataaars/svg?seed=vikram" 
-                    className="w-12 h-12 bg-slate-800 rounded-xl" 
-                    alt="technician" 
-                  />
-                  <div className="flex-1">
-                    <h4 className="font-bold text-sm">Vikram Singh</h4>
-                    <p className="text-[10px] text-slate-400">Mobile Mechanic • 4.98 ⭐</p>
-                  </div>
-                  <button className="bg-white text-slate-900 p-3 rounded-xl active:scale-95 transition-transform">
-                    <PhoneCall className="w-4 h-4" />
-                  </button>
-                </div>
               </div>
+              
+              {/* Assigned Technician & Mobile Service Van Details View */}
+              <DriverDetailsView
+                isAssigned={true}
+                driver={{
+                  id: order?.driver_id || 'tech_vikram_82',
+                  name: order?.driver_name || 'Vikram Singh',
+                  phone: order?.driver_phone || '+91 98480 22334',
+                  vehicleName: order?.vehicle_name || order?.driver_vehicle || 'Maruti Super Carry Mobile Workshop Van',
+                  vehiclePlate: order?.vehicle_plate || 'TS 08 EM 3319',
+                  vehicleType: 'Fully Equipped Mobile Diagnostic & Tool Unit',
+                  rating: 4.98,
+                  tripsCount: 1650,
+                  statusText: 'Technician en route with diagnostic tools',
+                  speedKmh: order?.driver_speed_kmh ?? 38,
+                }}
+              />
 
               {/* Real-time description info card */}
               <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-3">

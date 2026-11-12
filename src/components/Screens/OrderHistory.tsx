@@ -129,7 +129,7 @@ export default function OrderHistory({ onBack, customerId, onSelectOrder }: Orde
         {loading && orders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-10 h-10 border-3 border-orange-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-xs text-slate-400 font-medium">Loading your orders from Supabase...</p>
+            <p className="text-xs text-slate-400 font-medium">Loading your orders...</p>
           </div>
         ) : orders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -186,15 +186,17 @@ export default function OrderHistory({ onBack, customerId, onSelectOrder }: Orde
                       {order.fuel_type || order.description || order.service_type}
                     </h3>
 
-                    <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
-                      <Calendar className="w-3 h-3 text-slate-300" />
-                      <span>{formatDate(order.created_at)}</span>
-                      {order.payment_method && (
-                        <>
-                          <span>•</span>
-                          <span className="font-semibold text-slate-600">{order.payment_method}</span>
-                        </>
-                      )}
+                    <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-1 flex-wrap">
+                      <div className="flex items-center gap-1 text-slate-400">
+                        <Calendar className="w-3 h-3 text-slate-400" />
+                        <span>{formatDate(order.created_at)}</span>
+                      </div>
+                      <span>•</span>
+                      <span className={`font-semibold ${order.payment_status === 'PAID' ? 'text-emerald-700' : 'text-slate-700'}`}>
+                        {order.payment_status === 'PAID'
+                          ? `Paid ₹${order.total_amount || order.price || 0} via ${order.payment_method || 'door'}`
+                          : `Pay on delivery: ₹${order.total_amount || order.price || 0}`}
+                      </span>
                     </div>
                   </div>
                 </div>
